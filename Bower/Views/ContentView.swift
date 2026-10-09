@@ -24,11 +24,6 @@ struct ContentView: View {
                     VideoGridView()
                 }
             }
-            .inspector(isPresented: Binding(get: { app.isPlayerVisible && app.showVideoList },
-                                            set: { app.showVideoList = $0 })) {
-                VideoListView()
-                    .inspectorColumnWidth(min: 280, ideal: 340, max: 560)
-            }
             .toolbar {
                 if app.isPlayerVisible {
                     ToolbarItem(placement: .navigation) {
@@ -68,6 +63,16 @@ struct ContentView: View {
                 }
                 .sharedBackgroundVisibility(.hidden)
             }
+        }
+        // On the split view rather than the detail column, so the list is
+        // always a full-height trailing column; on the detail column it came
+        // back under a window-wide toolbar after being toggled.
+        .inspector(isPresented: Binding(get: { app.isPlayerVisible && app.showVideoList },
+                                        // Leaving the player dismisses the inspector too;
+                                        // that must not count as the user hiding the list.
+                                        set: { if app.isPlayerVisible { app.showVideoList = $0 } })) {
+            VideoListView()
+                .inspectorColumnWidth(min: 280, ideal: 340, max: 560)
         }
         .navigationTitle(app.displayedTitle)
         .sheet(item: $app.activeSheet) { sheet in
