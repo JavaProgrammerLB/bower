@@ -123,22 +123,26 @@ struct VideoRow: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 3) {
+            // As tall as the thumbnail, with the metadata row pinned to its
+            // bottom edge. The row has a fixed height, so the buttons that
+            // appear on hover never shift the layout.
+            VStack(alignment: .leading, spacing: 0) {
                 Text(video.title)
                     .font(.callout.weight(isCurrent ? .semibold : .regular))
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 4) {
+                Spacer(minLength: 2)
+                HStack(spacing: 2) {
                     Text(meta)
                         .lineLimit(1)
-                    Spacer(minLength: 0)
-                    if isHovering || isSkipped || isBookmarked {
-                        actionButtons(isSkipped: isSkipped, isBookmarked: isBookmarked)
-                    }
+                    Spacer(minLength: 4)
+                    actionButtons(isSkipped: isSkipped, isBookmarked: isBookmarked)
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .frame(height: 18)
             }
+            .frame(height: 63)
         }
         .padding(6)
         .background {
@@ -168,29 +172,36 @@ struct VideoRow: View {
     @ViewBuilder
     private func actionButtons(isSkipped: Bool, isBookmarked: Bool) -> some View {
         if isSkipped {
-            Button {
+            rowButton("eye", help: "Show — include this video in playback again") {
                 app.store.setSkipped(video.id, false)
-            } label: {
-                Image(systemName: "eye")
             }
-            .help("Show — include this video in playback again")
         } else {
             if isHovering {
-                Button {
+                rowButton("eye.slash", help: "Hide — skip this video during playback") {
                     app.playback.hide(video)
-                } label: {
-                    Image(systemName: "eye.slash")
                 }
-                .help("Hide — skip this video during playback")
             }
-            Button {
-                app.store.toggleBookmark(video)
-            } label: {
-                Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                    .foregroundStyle(isBookmarked ? Color.accentColor : .secondary)
+            if isHovering || isBookmarked {
+                rowButton(isBookmarked ? "bookmark.fill" : "bookmark",
+                          tint: isBookmarked ? .accentColor : nil,
+                          help: isBookmarked ? "Remove Bookmark" : "Bookmark") {
+                    app.store.toggleBookmark(video)
+                }
             }
-            .help(isBookmarked ? "Remove Bookmark" : "Bookmark")
         }
+    }
+
+    private func rowButton(_ symbol: String, tint: Color? = nil, help: String,
+                           action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(tint ?? .secondary)
+                .frame(width: 20, height: 18)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .help(help)
     }
 }
 
