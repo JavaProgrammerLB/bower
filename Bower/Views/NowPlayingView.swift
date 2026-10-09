@@ -90,7 +90,6 @@ private struct VideoHeader: View {
             }
             .buttonStyle(.plain)
             .help("Open in YouTube")
-            .textSelection(.enabled)
 
             HStack(spacing: 6) {
                 let details = [video.sourceTitle, RelativeTime.format(video.publishedDate).nilIfEmpty, video.duration]
