@@ -25,6 +25,7 @@ struct VideoListView: View {
                     }
                 }
                 .listStyle(.plain)
+                .safeAreaPadding(.top, 10)
                 .scrollContentBackground(.hidden)
                 .overlay {
                     if videos.isEmpty && !app.filter.isEmpty {
@@ -64,15 +65,10 @@ struct VideoListView: View {
                     .monospacedDigit()
             }
             Spacer()
-            HStack(spacing: 4) {
-                if app.selection == .history {
-                    Button("Clear") { app.store.clearHistory() }
-                        .controlSize(.small)
-                        .disabled(app.store.watchHistory.isEmpty)
-                        .padding(.trailing, 4)
-                }
-                PlaybackModeButtons()
-                    .buttonStyle(.borderless)
+            if app.selection == .history {
+                Button("Clear") { app.store.clearHistory() }
+                    .controlSize(.small)
+                    .disabled(app.store.watchHistory.isEmpty)
             }
         }
         .padding(.horizontal, 14)
@@ -205,14 +201,31 @@ struct VideoRow: View {
     }
 }
 
-/// Narrows the video list; pinned to the bottom of the right sidebar.
+/// Pinned to the bottom of the right sidebar: the filter field, plus
+/// shuffle and repeat.
 private struct FilterBar: View {
     @Environment(AppModel.self) private var app
     @FocusState private var isFocused: Bool
 
     var body: some View {
+        HStack(spacing: 8) {
+            filterField
+            HStack(spacing: 0) {
+                PlaybackModeButtons()
+            }
+            .buttonStyle(.borderless)
+            .padding(.horizontal, 6)
+            .frame(height: 32)
+            .glassEffect(.regular.interactive(), in: .capsule)
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+        .padding(.top, 6)
+    }
+
+    private var filterField: some View {
         @Bindable var app = app
-        HStack(spacing: 6) {
+        return HStack(spacing: 6) {
             Image(systemName: "line.3.horizontal.decrease")
                 .foregroundStyle(.secondary)
             TextField("Filter", text: $app.filter)
@@ -236,9 +249,6 @@ private struct FilterBar: View {
         .padding(.horizontal, 12)
         .frame(height: 32)
         .glassEffect(.regular.interactive(), in: .capsule)
-        .padding(.horizontal, 12)
-        .padding(.bottom, 12)
-        .padding(.top, 6)
     }
 }
 
