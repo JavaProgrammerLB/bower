@@ -64,22 +64,15 @@ struct VideoListView: View {
                     .monospacedDigit()
             }
             Spacer()
-            if app.selection == .history {
-                Button("Clear") { app.store.clearHistory() }
-                    .controlSize(.small)
-                    .disabled(app.store.watchHistory.isEmpty)
-            } else if let first = app.displayedVideos.first(where: { !app.store.isSkipped($0.id) }) {
-                Button {
-                    if app.playback.shuffle, let random = app.displayedVideos.filter({ !app.store.isSkipped($0.id) }).randomElement() {
-                        app.play(random)
-                    } else {
-                        app.play(first)
-                    }
-                } label: {
-                    Label("Play All", systemImage: "play.fill")
+            HStack(spacing: 4) {
+                if app.selection == .history {
+                    Button("Clear") { app.store.clearHistory() }
+                        .controlSize(.small)
+                        .disabled(app.store.watchHistory.isEmpty)
+                        .padding(.trailing, 4)
                 }
-                .controlSize(.small)
-                .help("Play this list from the start")
+                PlaybackModeButtons()
+                    .buttonStyle(.borderless)
             }
         }
         .padding(.horizontal, 14)
@@ -235,5 +228,41 @@ private struct FilterBar: View {
         .padding(.horizontal, 12)
         .padding(.bottom, 12)
         .padding(.top, 6)
+    }
+}
+
+/// Shuffle and repeat, which apply to the queue being played.
+private struct PlaybackModeButtons: View {
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        let playback = app.playback
+        Button {
+            playback.shuffle.toggle()
+        } label: {
+            Image(systemName: "shuffle")
+                .foregroundStyle(playback.shuffle ? Color.accentColor : .secondary)
+                .frame(width: 26, height: 22)
+                .contentShape(Rectangle())
+        }
+        .help(playback.shuffle ? "Shuffle: On" : "Shuffle: Off")
+
+        Button {
+            playback.loopMode = playback.loopMode.next
+        } label: {
+            Image(systemName: playback.loopMode == .one ? "repeat.1" : "repeat")
+                .foregroundStyle(playback.loopMode == .off ? Color.secondary : Color.accentColor)
+                .frame(width: 26, height: 22)
+                .contentShape(Rectangle())
+        }
+        .help(repeatHelp(playback.loopMode))
+    }
+
+    private func repeatHelp(_ mode: LoopMode) -> String {
+        switch mode {
+        case .off: "Repeat: Off"
+        case .all: "Repeat: All"
+        case .one: "Repeat: One"
+        }
     }
 }

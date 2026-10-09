@@ -116,20 +116,6 @@ private struct VideoHeader: View {
                 .controlGroupStyle(.navigation)
                 .fixedSize()
 
-                Toggle(isOn: Binding(get: { playback.shuffle }, set: { playback.shuffle = $0 })) {
-                    Label("Shuffle", systemImage: "shuffle")
-                }
-                .toggleStyle(.button)
-                .help("Shuffle")
-
-                Button {
-                    playback.loopMode = playback.loopMode.next
-                } label: {
-                    Label("Repeat", systemImage: playback.loopMode == .one ? "repeat.1" : "repeat")
-                }
-                .foregroundStyle(playback.loopMode == .off ? Color.primary : Color.accentColor)
-                .help(loopHelp(playback.loopMode))
-
                 Spacer()
 
                 Button {
@@ -152,14 +138,6 @@ private struct VideoHeader: View {
             .labelStyle(.iconOnly)
             .buttonStyle(.bordered)
             .controlSize(.large)
-        }
-    }
-
-    private func loopHelp(_ mode: LoopMode) -> String {
-        switch mode {
-        case .off: "Repeat: Off"
-        case .all: "Repeat: All"
-        case .one: "Repeat: One"
         }
     }
 }
