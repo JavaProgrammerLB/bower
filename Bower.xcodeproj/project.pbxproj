@@ -1,0 +1,464 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		07BF27E0B3898A5FE02765C9 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54090C49B65F709DEC541A31 /* NowPlayingView.swift */; };
+		15F8BF1230F514D2C2008EDE /* TimeFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773ED08805B3C3A95EFEA796 /* TimeFormatting.swift */; };
+		21502D898944DCE0EFCE75D9 /* DescriptionText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28414A47676B3B7C9D9C2AA2 /* DescriptionText.swift */; };
+		2CA1688BC23C72D9D81809C1 /* VideoGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27E03F55D573E561B270290E /* VideoGridView.swift */; };
+		35488ABBBF361C1B3718B297 /* Sheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A354A3C71DF1B808FA64D0 /* Sheets.swift */; };
+		38CC58035035BFA557AAFF4D /* VideoCaches.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EE8FB91C7AE55DF1D615649 /* VideoCaches.swift */; };
+		3CA1B44C5A69C775EAC4E7E9 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20859CFDAC9338B33465ACCC /* AppCommands.swift */; };
+		5FD0E7176999C1D26998F2D6 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A23F39DAF47B5ABFE98FA1E /* AppModel.swift */; };
+		640B668A7094E7B1E5D3C4E1 /* CookieStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A9512586021C24F061A6231 /* CookieStore.swift */; };
+		686383277A19813120A2E0F7 /* VideoListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0154239E5C99223DDA25CD6 /* VideoListView.swift */; };
+		78C1C3C1A424A0CF25E994A0 /* LibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFC52B777B2A98DDB0E96089 /* LibraryService.swift */; };
+		881A05F1F7BEF760E70EB5C5 /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A816E002658A9CBAFBE1C90 /* LibraryStore.swift */; };
+		8CAA2B273691CE9B5314601A /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 211D7FE7F5E4B41163E95F11 /* Models.swift */; };
+		925E5981F2E942E234CD77FE /* InnerTubeParsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 164684506DF89B9853B313C6 /* InnerTubeParsing.swift */; };
+		9A37A0771A6CF8F4D05529E6 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A85846DD5843E62317EC796 /* SidebarView.swift */; };
+		9C8AF2FE3FDCC2E825C82B96 /* YouTubePlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4031654C767BD19B4AFFCCEB /* YouTubePlayer.swift */; };
+		A537812EFA37B0526861DBD4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F03C55D8D29A6B046436FBBD /* ContentView.swift */; };
+		B1020C74D5164CD6B033D7CC /* BowerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1EE008D47D24C51E481823 /* BowerApp.swift */; };
+		BDE27EED2F3BDEFA48274C31 /* AppPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = B483498F33E8D93E0225E2D6 /* AppPaths.swift */; };
+		C1BB0AA8E22FBB916A254145 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 141F11DE1FA2A3AFC6AF1E18 /* Assets.xcassets */; };
+		C8DC2ECAE1AA6EDBDDF393D9 /* YouTubeURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2DAA3D4D696C0DE32A86846 /* YouTubeURL.swift */; };
+		DB6D90B49B69BBF3FDDB451F /* InnerTubeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43CBE77B3DC7D59D208DA44C /* InnerTubeClient.swift */; };
+		F5D172ACB79FBE833A07F770 /* PlaybackModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3061611531E23EBDB4237FF7 /* PlaybackModel.swift */; };
+		F7D54942AA35E3C560623726 /* ImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24F7C31649433986CFB15C8F /* ImageLoader.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		10A354A3C71DF1B808FA64D0 /* Sheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sheets.swift; sourceTree = "<group>"; };
+		141F11DE1FA2A3AFC6AF1E18 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		164684506DF89B9853B313C6 /* InnerTubeParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InnerTubeParsing.swift; sourceTree = "<group>"; };
+		1A9512586021C24F061A6231 /* CookieStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookieStore.swift; sourceTree = "<group>"; };
+		20859CFDAC9338B33465ACCC /* AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommands.swift; sourceTree = "<group>"; };
+		211D7FE7F5E4B41163E95F11 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		24F7C31649433986CFB15C8F /* ImageLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLoader.swift; sourceTree = "<group>"; };
+		27E03F55D573E561B270290E /* VideoGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoGridView.swift; sourceTree = "<group>"; };
+		28414A47676B3B7C9D9C2AA2 /* DescriptionText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DescriptionText.swift; sourceTree = "<group>"; };
+		3061611531E23EBDB4237FF7 /* PlaybackModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackModel.swift; sourceTree = "<group>"; };
+		4031654C767BD19B4AFFCCEB /* YouTubePlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubePlayer.swift; sourceTree = "<group>"; };
+		43CBE77B3DC7D59D208DA44C /* InnerTubeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InnerTubeClient.swift; sourceTree = "<group>"; };
+		4A85846DD5843E62317EC796 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		4C82A50F5B5CD3FA5C883DB1 /* Bower.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bower.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		54090C49B65F709DEC541A31 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
+		6A816E002658A9CBAFBE1C90 /* LibraryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStore.swift; sourceTree = "<group>"; };
+		6EE8FB91C7AE55DF1D615649 /* VideoCaches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCaches.swift; sourceTree = "<group>"; };
+		773ED08805B3C3A95EFEA796 /* TimeFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormatting.swift; sourceTree = "<group>"; };
+		8A23F39DAF47B5ABFE98FA1E /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		B483498F33E8D93E0225E2D6 /* AppPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPaths.swift; sourceTree = "<group>"; };
+		BFC52B777B2A98DDB0E96089 /* LibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryService.swift; sourceTree = "<group>"; };
+		C2DAA3D4D696C0DE32A86846 /* YouTubeURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeURL.swift; sourceTree = "<group>"; };
+		DA1EE008D47D24C51E481823 /* BowerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BowerApp.swift; sourceTree = "<group>"; };
+		E0154239E5C99223DDA25CD6 /* VideoListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoListView.swift; sourceTree = "<group>"; };
+		F03C55D8D29A6B046436FBBD /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		10B9E0BE42E1B8313918F913 /* Store */ = {
+			isa = PBXGroup;
+			children = (
+				B483498F33E8D93E0225E2D6 /* AppPaths.swift */,
+				6A816E002658A9CBAFBE1C90 /* LibraryStore.swift */,
+				6EE8FB91C7AE55DF1D615649 /* VideoCaches.swift */,
+			);
+			path = Store;
+			sourceTree = "<group>";
+		};
+		3455F7AE576DCEA0521A69CF = {
+			isa = PBXGroup;
+			children = (
+				CD90BC759D5638EA595990C8 /* Bower */,
+				C7DB063C559463E9EF032893 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		37E7C8B5480A03B3402461C7 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				211D7FE7F5E4B41163E95F11 /* Models.swift */,
+				773ED08805B3C3A95EFEA796 /* TimeFormatting.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		8956E4BE77309C07BE29583B /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F03C55D8D29A6B046436FBBD /* ContentView.swift */,
+				28414A47676B3B7C9D9C2AA2 /* DescriptionText.swift */,
+				54090C49B65F709DEC541A31 /* NowPlayingView.swift */,
+				10A354A3C71DF1B808FA64D0 /* Sheets.swift */,
+				4A85846DD5843E62317EC796 /* SidebarView.swift */,
+				27E03F55D573E561B270290E /* VideoGridView.swift */,
+				E0154239E5C99223DDA25CD6 /* VideoListView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A248C9AE4B5CE62C67644A0D /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				3061611531E23EBDB4237FF7 /* PlaybackModel.swift */,
+				4031654C767BD19B4AFFCCEB /* YouTubePlayer.swift */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
+		B2C1D56493931885FF4DC36D /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				24F7C31649433986CFB15C8F /* ImageLoader.swift */,
+				BFC52B777B2A98DDB0E96089 /* LibraryService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		C4CB579BCE6CA13B76E12DF3 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				20859CFDAC9338B33465ACCC /* AppCommands.swift */,
+				8A23F39DAF47B5ABFE98FA1E /* AppModel.swift */,
+				DA1EE008D47D24C51E481823 /* BowerApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		C7DB063C559463E9EF032893 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4C82A50F5B5CD3FA5C883DB1 /* Bower.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		CD90BC759D5638EA595990C8 /* Bower */ = {
+			isa = PBXGroup;
+			children = (
+				141F11DE1FA2A3AFC6AF1E18 /* Assets.xcassets */,
+				C4CB579BCE6CA13B76E12DF3 /* App */,
+				37E7C8B5480A03B3402461C7 /* Models */,
+				A248C9AE4B5CE62C67644A0D /* Player */,
+				B2C1D56493931885FF4DC36D /* Services */,
+				10B9E0BE42E1B8313918F913 /* Store */,
+				8956E4BE77309C07BE29583B /* Views */,
+				DAB2B0C51C7584FE59F9F271 /* YouTube */,
+			);
+			path = Bower;
+			sourceTree = "<group>";
+		};
+		DAB2B0C51C7584FE59F9F271 /* YouTube */ = {
+			isa = PBXGroup;
+			children = (
+				1A9512586021C24F061A6231 /* CookieStore.swift */,
+				43CBE77B3DC7D59D208DA44C /* InnerTubeClient.swift */,
+				164684506DF89B9853B313C6 /* InnerTubeParsing.swift */,
+				C2DAA3D4D696C0DE32A86846 /* YouTubeURL.swift */,
+			);
+			path = YouTube;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		6F234347F128626480D322C8 /* Bower */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 781BA1D8C69E26F1359EC4CC /* Build configuration list for PBXNativeTarget "Bower" */;
+			buildPhases = (
+				F69B131B09CCA1CFD7173B87 /* Sources */,
+				3D45D667FC69B245B216F751 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Bower;
+			packageProductDependencies = (
+			);
+			productName = Bower;
+			productReference = 4C82A50F5B5CD3FA5C883DB1 /* Bower.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5FA4BDE0119598AD15157AE9 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					6F234347F128626480D322C8 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = CE7409219373DB597192FDE7 /* Build configuration list for PBXProject "Bower" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 3455F7AE576DCEA0521A69CF;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = C7DB063C559463E9EF032893 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				6F234347F128626480D322C8 /* Bower */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3D45D667FC69B245B216F751 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C1BB0AA8E22FBB916A254145 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F69B131B09CCA1CFD7173B87 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3CA1B44C5A69C775EAC4E7E9 /* AppCommands.swift in Sources */,
+				5FD0E7176999C1D26998F2D6 /* AppModel.swift in Sources */,
+				BDE27EED2F3BDEFA48274C31 /* AppPaths.swift in Sources */,
+				B1020C74D5164CD6B033D7CC /* BowerApp.swift in Sources */,
+				A537812EFA37B0526861DBD4 /* ContentView.swift in Sources */,
+				640B668A7094E7B1E5D3C4E1 /* CookieStore.swift in Sources */,
+				21502D898944DCE0EFCE75D9 /* DescriptionText.swift in Sources */,
+				F7D54942AA35E3C560623726 /* ImageLoader.swift in Sources */,
+				DB6D90B49B69BBF3FDDB451F /* InnerTubeClient.swift in Sources */,
+				925E5981F2E942E234CD77FE /* InnerTubeParsing.swift in Sources */,
+				78C1C3C1A424A0CF25E994A0 /* LibraryService.swift in Sources */,
+				881A05F1F7BEF760E70EB5C5 /* LibraryStore.swift in Sources */,
+				8CAA2B273691CE9B5314601A /* Models.swift in Sources */,
+				07BF27E0B3898A5FE02765C9 /* NowPlayingView.swift in Sources */,
+				F5D172ACB79FBE833A07F770 /* PlaybackModel.swift in Sources */,
+				35488ABBBF361C1B3718B297 /* Sheets.swift in Sources */,
+				9A37A0771A6CF8F4D05529E6 /* SidebarView.swift in Sources */,
+				15F8BF1230F514D2C2008EDE /* TimeFormatting.swift in Sources */,
+				38CC58035035BFA557AAFF4D /* VideoCaches.swift in Sources */,
+				2CA1688BC23C72D9D81809C1 /* VideoGridView.swift in Sources */,
+				686383277A19813120A2E0F7 /* VideoListView.swift in Sources */,
+				9C8AF2FE3FDCC2E825C82B96 /* YouTubePlayer.swift in Sources */,
+				C8DC2ECAE1AA6EDBDDF393D9 /* YouTubeURL.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		8094C6B53F54B1E2B6A2755C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Bower;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Limboy";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.limboy.Bower;
+				PRODUCT_NAME = Bower;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		95132B8128A18CB90F79D640 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		DCA7764FDDE09B7716F89112 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Bower;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Limboy";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.limboy.Bower;
+				PRODUCT_NAME = Bower;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		FC7765BE66D5B81FC20BD3D8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		781BA1D8C69E26F1359EC4CC /* Build configuration list for PBXNativeTarget "Bower" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8094C6B53F54B1E2B6A2755C /* Debug */,
+				DCA7764FDDE09B7716F89112 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CE7409219373DB597192FDE7 /* Build configuration list for PBXProject "Bower" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				95132B8128A18CB90F79D640 /* Debug */,
+				FC7765BE66D5B81FC20BD3D8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 5FA4BDE0119598AD15157AE9 /* Project object */;
+}

@@ -1,0 +1,239 @@
+import AppKit
+import SwiftUI
+
+/// The right-hand list of videos for whatever the sidebar has selected.
+struct VideoListView: View {
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        let videos = app.filteredVideos
+        let playingHere = app.playback.queueContext == app.selection
+        let currentID = playingHere ? app.playback.current?.id : nil
+
+        VStack(spacing: 0) {
+            header(count: app.displayedVideos.count, currentID: currentID)
+            Divider()
+            ScrollViewReader { proxy in
+                List {
+                    ForEach(videos) { video in
+                        VideoRow(video: video, isCurrent: video.id == currentID,
+                                 isPlaying: video.id == currentID && app.playback.player.isPlaying,
+                                 showsSource: showsSource)
+                            .id(video.id)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .overlay {
+                    if videos.isEmpty && !app.filter.isEmpty {
+                        ContentUnavailableView.search(text: app.filter)
+                    }
+                }
+                .onChange(of: currentID) { _, id in
+                    guard let id else { return }
+                    withAnimation { proxy.scrollTo(id, anchor: .center) }
+                }
+                .onAppear {
+                    if let currentID { proxy.scrollTo(currentID, anchor: .center) }
+                }
+                .safeAreaBar(edge: .bottom) { FilterBar() }
+            }
+        }
+        .onDisappear { app.filter = "" }
+    }
+
+    /// Single-source lists don't need every row to repeat the source name.
+    private var showsSource: Bool {
+        switch app.selection {
+        case .playlist, .channel: false
+        default: true
+        }
+    }
+
+    private func header(count: Int, currentID: String?) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(app.displayedTitle)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(positionText(count: count, currentID: currentID))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Spacer()
+            if app.selection == .history {
+                Button("Clear") { app.store.clearHistory() }
+                    .controlSize(.small)
+                    .disabled(app.store.watchHistory.isEmpty)
+            } else if let first = app.displayedVideos.first(where: { !app.store.isSkipped($0.id) }) {
+                Button {
+                    if app.playback.shuffle, let random = app.displayedVideos.filter({ !app.store.isSkipped($0.id) }).randomElement() {
+                        app.play(random)
+                    } else {
+                        app.play(first)
+                    }
+                } label: {
+                    Label("Play All", systemImage: "play.fill")
+                }
+                .controlSize(.small)
+                .help("Play this list from the start")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    private func positionText(count: Int, currentID: String?) -> String {
+        let noun = count == 1 ? "video" : "videos"
+        guard let currentID, let index = app.displayedVideos.firstIndex(where: { $0.id == currentID }) else {
+            return "\(count) \(noun)"
+        }
+        return "\(index + 1) of \(count) \(noun)"
+    }
+}
+
+struct VideoRow: View {
+    @Environment(AppModel.self) private var app
+    let video: Video
+    let isCurrent: Bool
+    let isPlaying: Bool
+    let showsSource: Bool
+
+    @State private var isHovering = false
+
+    var body: some View {
+        let isSkipped = app.store.isSkipped(video.id)
+        let isBookmarked = app.store.isBookmarked(video.id)
+
+        HStack(alignment: .top, spacing: 10) {
+            ZStack(alignment: .bottomTrailing) {
+                RemoteImage(url: video.thumbnail)
+                    .frame(width: 112, height: 63)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                Text(video.duration)
+                    .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 3))
+                    .padding(4)
+                if isCurrent {
+                    Image(systemName: isPlaying ? "waveform" : "pause.fill")
+                        .symbolEffect(.variableColor.iterative, isActive: isPlaying)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 112, height: 63)
+                        .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(video.title)
+                    .font(.callout.weight(isCurrent ? .semibold : .regular))
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 4) {
+                    Text(meta)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    if isHovering || isSkipped || isBookmarked {
+                        actionButtons(isSkipped: isSkipped, isBookmarked: isBookmarked)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(6)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isCurrent ? Color.accentColor.opacity(0.16) : isHovering ? Color.primary.opacity(0.05) : .clear)
+        }
+        .opacity(isSkipped ? 0.45 : 1)
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .onTapGesture {
+            if isCurrent {
+                if !isPlaying { app.playback.togglePlayPause() }
+            } else {
+                app.play(video)
+            }
+        }
+        .contextMenu { VideoContextMenu(video: video) }
+    }
+
+    private var meta: String {
+        var parts: [String] = []
+        if let date = video.publishedDate { parts.append(RelativeTime.format(date)) }
+        if showsSource, let source = video.sourceTitle { parts.append(source) }
+        return parts.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    private func actionButtons(isSkipped: Bool, isBookmarked: Bool) -> some View {
+        if isSkipped {
+            Button {
+                app.store.setSkipped(video.id, false)
+            } label: {
+                Image(systemName: "eye")
+            }
+            .help("Show — include this video in playback again")
+        } else {
+            if isHovering {
+                Button {
+                    app.playback.hide(video)
+                } label: {
+                    Image(systemName: "eye.slash")
+                }
+                .help("Hide — skip this video during playback")
+            }
+            Button {
+                app.store.toggleBookmark(video)
+            } label: {
+                Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                    .foregroundStyle(isBookmarked ? Color.accentColor : .secondary)
+            }
+            .help(isBookmarked ? "Remove Bookmark" : "Bookmark")
+        }
+    }
+}
+
+/// Narrows the video list; pinned to the bottom of the right sidebar.
+private struct FilterBar: View {
+    @Environment(AppModel.self) private var app
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        @Bindable var app = app
+        HStack(spacing: 6) {
+            Image(systemName: "line.3.horizontal.decrease")
+                .foregroundStyle(.secondary)
+            TextField("Filter", text: $app.filter)
+                .textFieldStyle(.plain)
+                .focused($isFocused)
+                .onExitCommand {
+                    app.filter = ""
+                    isFocused = false
+                }
+            if !app.filter.isEmpty {
+                Button {
+                    app.filter = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear Filter")
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 32)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+        .padding(.top, 6)
+    }
+}
