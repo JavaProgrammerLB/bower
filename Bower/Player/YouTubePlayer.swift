@@ -181,16 +181,32 @@ final class YouTubePlayer: NSObject {
           width: '100%', height: '100%',
           host: 'https://www.youtube.com',
           playerVars: { playsinline: 1, enablejsapi: 1, iv_load_policy: 3, rel: 0, autoplay: 0,
-                        origin: location.origin },
+                        hl: 'en', cc_lang_pref: 'en', origin: location.origin },
           events: {
             onReady: function () { post({ type: 'ready' }); },
             onStateChange: function (e) { post(snapshot('state', { state: e.data })); },
+            onApiChange: ltPickCaptions,
             onError: function (e) { post({ type: 'error', code: e.data }); }
           }
         });
       }
+      // cc_lang_pref is only a hint: an uploader's default track still wins.
+      // So once the captions module loads, switch to English or turn
+      // captions off. Once per video, so a track picked by hand stays put.
+      var captionsPicked = false;
+      function ltPickCaptions() {
+        if (captionsPicked || !player || !player.getOption) return;
+        var tracks = player.getOption('captions', 'tracklist');
+        if (!tracks || !tracks.length) return;
+        captionsPicked = true;
+        var current = player.getOption('captions', 'track') || {};
+        if (/^en/.test(current.languageCode || '')) return;
+        var english = tracks.filter(function (t) { return /^en/.test(t.languageCode); })[0];
+        player.setOption('captions', 'track', english ? { languageCode: english.languageCode } : {});
+      }
       function ltLoad(id, start, autoplay) {
         if (!player) return;
+        captionsPicked = false;
         var args = { videoId: id, startSeconds: start };
         if (autoplay) player.loadVideoById(args); else player.cueVideoById(args);
       }
