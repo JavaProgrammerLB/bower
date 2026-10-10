@@ -51,6 +51,7 @@ struct SidebarView: View {
             Section {
                 Label("Latest", systemImage: "sparkles.tv")
                     .tag(LibrarySelection.latest)
+                    .background(FolderDropInstaller(canDrop: canDrop(_:intoFolder:), onDrop: drop(_:intoFolder:)))
                 Label("Bookmarks", systemImage: "bookmark")
                     .tag(LibrarySelection.bookmarks)
                 Label("History", systemImage: "clock.arrow.circlepath")
@@ -174,20 +175,9 @@ struct SidebarView: View {
                 Button("Delete Folder…", role: .destructive) { pendingDeletion = .folder(folder) }
             }
             // `.onMove` only drops between rows, so a collapsed folder could
-            // never take a source. Dropping onto the header files it inside.
-            .onDrop(of: [.utf8PlainText], isTargeted: nil) { providers in
-                guard let provider = providers.first else { return false }
-                _ = provider.loadObject(ofClass: NSString.self) { object, _ in
-                    guard let text = object as? String, let ref = Self.sourceRef(fromDragText: text) else { return }
-                    Task { @MainActor in
-                        guard store.sidebarOrder.contains(where: {
-                            if case .folder(folder.id, let children) = $0 { !children.contains(ref) } else { false }
-                        }) else { return }
-                        withAnimation(.snappy(duration: 0.2)) { store.move(ref, toFolder: folder.id) }
-                    }
-                }
-                return true
-            }
+            // never take a source. The marker lets `FolderDropProxy` turn a
+            // drop onto this header into "file it inside".
+            .background(FolderDropMarker(folderID: folder.id))
 
         case .source(let ref, let parent):
             if let source = store.source(ref) {
@@ -239,13 +229,25 @@ struct SidebarView: View {
 
     // MARK: Reordering
 
-    private nonisolated static let dragPrefix = "bower-source:"
+    private func canDrop(_ ref: SourceRef, intoFolder folderID: String) -> Bool {
+        store.sidebarOrder.contains {
+            if case .folder(folderID, let children) = $0 { !children.contains(ref) } else { false }
+        }
+    }
 
-    private static func dragText(for ref: SourceRef) -> String {
+    private func drop(_ ref: SourceRef, intoFolder folderID: String) -> Bool {
+        guard canDrop(ref, intoFolder: folderID) else { return false }
+        withAnimation(.snappy(duration: 0.2)) { store.move(ref, toFolder: folderID) }
+        return true
+    }
+
+    private static let dragPrefix = "bower-source:"
+
+    fileprivate static func dragText(for ref: SourceRef) -> String {
         "\(dragPrefix)\(ref.type.rawValue):\(ref.id)"
     }
 
-    private nonisolated static func sourceRef(fromDragText text: String) -> SourceRef? {
+    fileprivate static func sourceRef(fromDragText text: String) -> SourceRef? {
         guard text.hasPrefix(dragPrefix) else { return nil }
         let body = text.dropFirst(dragPrefix.count)
         guard let colon = body.firstIndex(of: ":"),
@@ -390,5 +392,145 @@ private struct RefreshStatusBar: View {
         guard let last = app.store.lastRefresh else { return "Not updated yet" }
         if Date().timeIntervalSince(last) < 60 { return "Updated just now" }
         return "Updated \(RelativeTime.format(last))"
+    }
+}
+
+// MARK: Folder drops
+
+/// Tags a folder header's row so `FolderDropProxy` can tell which folder the
+/// pointer is over.
+private struct FolderDropMarker: NSViewRepresentable {
+    let folderID: String
+
+    final class MarkerView: NSView {
+        var folderID = ""
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    }
+
+    func makeNSView(context: Context) -> MarkerView { MarkerView() }
+    func updateNSView(_ view: MarkerView, context: Context) { view.folderID = folderID }
+}
+
+/// Puts `FolderDropProxy` in front of the sidebar outline view's data source.
+///
+/// A SwiftUI `.onDrop` on a row is a separate drop target inside the outline
+/// view, so the drag kept switching between it and the list's own reordering,
+/// and the selected row flashed between focused and unfocused. Doing folder
+/// drops through the outline view itself keeps a single drop target, and
+/// AppKit draws the folder highlight.
+private struct FolderDropInstaller: NSViewRepresentable {
+    let canDrop: (SourceRef, String) -> Bool
+    let onDrop: (SourceRef, String) -> Bool
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        let (canDrop, onDrop) = (canDrop, onDrop)
+        DispatchQueue.main.async {
+            guard let outline = view.enclosing(NSOutlineView.self) else { return }
+            let proxy = FolderDropProxy.install(on: outline)
+            proxy.canDrop = canDrop
+            proxy.onDrop = onDrop
+        }
+    }
+}
+
+private final class FolderDropProxy: NSObject, NSOutlineViewDataSource {
+    private static var key: UInt8 = 0
+
+    /// SwiftUI's own data source; everything that isn't a folder drop goes here.
+    nonisolated(unsafe) weak var target: (NSObject & NSOutlineViewDataSource)?
+    var canDrop: ((SourceRef, String) -> Bool)?
+    var onDrop: ((SourceRef, String) -> Bool)?
+
+    static func install(on outline: NSOutlineView) -> FolderDropProxy {
+        let proxy = objc_getAssociatedObject(outline, &key) as? FolderDropProxy ?? FolderDropProxy()
+        // The outline view holds its data source weakly; tie the proxy's
+        // lifetime to it instead.
+        objc_setAssociatedObject(outline, &key, proxy, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        if outline.dataSource !== proxy, let current = outline.dataSource as? NSObject & NSOutlineViewDataSource {
+            proxy.target = current
+            outline.dataSource = proxy
+        }
+        return proxy
+    }
+
+    nonisolated override func responds(to selector: Selector!) -> Bool {
+        super.responds(to: selector) || (target?.responds(to: selector) ?? false)
+    }
+
+    nonisolated override func forwardingTarget(for selector: Selector!) -> Any? { target }
+
+    // Every data source method the outline view needs is forwarded; only the
+    // drop methods are implemented here so they can be intercepted.
+
+    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+        target?.outlineView?(outlineView, numberOfChildrenOfItem: item) ?? 0
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+        target!.outlineView!(outlineView, child: index, ofItem: item)
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+        target?.outlineView?(outlineView, isItemExpandable: item) ?? false
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo,
+                     proposedItem item: Any?, proposedChildIndex index: Int) -> NSDragOperation {
+        if let (row, _) = folderTarget(outlineView, info) {
+            outlineView.setDropItem(outlineView.item(atRow: row), dropChildIndex: NSOutlineViewDropOnItemIndex)
+            return .move
+        }
+        return target?.outlineView?(outlineView, validateDrop: info, proposedItem: item, proposedChildIndex: index) ?? []
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo,
+                     item: Any?, childIndex index: Int) -> Bool {
+        if index == NSOutlineViewDropOnItemIndex, let (_, folderID) = folderTarget(outlineView, info),
+           let ref = draggedSource(info) {
+            return onDrop?(ref, folderID) ?? false
+        }
+        return target?.outlineView?(outlineView, acceptDrop: info, item: item, childIndex: index) ?? false
+    }
+
+    /// The folder header under the pointer, when a source is being dragged.
+    /// The top and bottom edges of the header are left to reordering so a
+    /// source can still be dropped between two folders.
+    private func folderTarget(_ outline: NSOutlineView, _ info: NSDraggingInfo) -> (row: Int, folderID: String)? {
+        guard let ref = draggedSource(info) else { return nil }
+        let point = outline.convert(info.draggingLocation, from: nil)
+        let row = outline.row(at: point)
+        guard row >= 0, let rowView = outline.rowView(atRow: row, makeIfNecessary: false),
+              let marker = rowView.descendant(FolderDropMarker.MarkerView.self) else { return nil }
+        let rect = outline.rect(ofRow: row)
+        let edge = rect.height * 0.25
+        guard point.y > rect.minY + edge, point.y < rect.maxY - edge else { return nil }
+        // Already in this folder: leave it to reordering.
+        guard canDrop?(ref, marker.folderID) == true else { return nil }
+        return (row, marker.folderID)
+    }
+
+    private func draggedSource(_ info: NSDraggingInfo) -> SourceRef? {
+        guard let text = info.draggingPasteboard.string(forType: .string) else { return nil }
+        return SidebarView.sourceRef(fromDragText: text)
+    }
+}
+
+private extension NSView {
+    func enclosing<T: NSView>(_ type: T.Type) -> T? {
+        var view = superview
+        while let current = view {
+            if let match = current as? T { return match }
+            view = current.superview
+        }
+        return nil
+    }
+
+    func descendant<T: NSView>(_ type: T.Type) -> T? {
+        for subview in subviews {
+            if let match = subview as? T ?? subview.descendant(type) { return match }
+        }
+        return nil
     }
 }
