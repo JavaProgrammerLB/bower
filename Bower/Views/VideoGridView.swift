@@ -21,76 +21,26 @@ struct VideoGridView: View {
                 }
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        header
-                        if videos.isEmpty {
-                            ContentUnavailableView.search(text: app.filter)
-                                .padding(.top, 60)
-                        } else {
-                            LazyVGrid(columns: columns, alignment: .leading, spacing: 28) {
-                                ForEach(videos) { video in
-                                    VideoCard(video: video, showsSource: showsSource)
-                                }
-                            }
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: 28) {
+                        ForEach(videos) { video in
+                            VideoCard(video: video, showsSource: showsSource)
                         }
                     }
                     .padding(.horizontal, 28)
-                    .padding(.top, 12)
+                    .padding(.top, 20)
                     .padding(.bottom, 28)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
+        .navigationSubtitle(videos.isEmpty ? "" : subtitle)
     }
 
     private var showsSource: Bool {
         switch app.selection {
         case .playlist, .channel: false
         default: true
-        }
-    }
-
-    private var header: some View {
-        HStack(alignment: .center, spacing: 14) {
-            if let ref = app.selection?.sourceRef, let source = app.store.source(ref) {
-                RemoteImage(url: source.thumbnail) {
-                    Image(systemName: ref.type == .channel ? "person.crop.circle.fill" : "list.and.film")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(width: 56, height: 56)
-                .clipShape(ref.type == .channel ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 10)))
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(app.displayedTitle)
-                    .font(.largeTitle.weight(.bold))
-                    .lineLimit(1)
-                Text(subtitle)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            if app.selection == .history {
-                Button("Clear History", role: .destructive) { app.store.clearHistory() }
-                    .controlSize(.large)
-            } else {
-                Button {
-                    app.playback.shuffle = true
-                    app.playAll()
-                } label: {
-                    Label("Shuffle", systemImage: "shuffle")
-                }
-                .controlSize(.large)
-                Button {
-                    app.playback.shuffle = false
-                    app.playAll()
-                } label: {
-                    Label("Play", systemImage: "play.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-            }
         }
     }
 
