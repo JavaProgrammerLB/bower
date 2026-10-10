@@ -3,6 +3,8 @@
 A native macOS 26 app (SwiftUI + AppKit) for following YouTube playlists and channels
 without the algorithm.
 
+![](assets/s1.jpg)
+
 ## Download
 
 [Download the latest Bower](https://github.com/limboy/bower/releases/latest) (a notarized DMG; open
