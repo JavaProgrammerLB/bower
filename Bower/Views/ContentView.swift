@@ -24,10 +24,6 @@ struct ContentView: View {
                     VideoGridView()
                 }
             }
-            // The window's minimum width comes from the columns' minimums, so
-            // the detail column has to carry its own; a minWidth on the whole
-            // window let the split view overflow and get cropped on both sides.
-            .frame(minWidth: 460)
             .toolbar {
                 if app.isPlayerVisible {
                     ToolbarItem(placement: .navigation) {

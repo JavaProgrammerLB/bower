@@ -160,9 +160,8 @@ private struct VideoHeader: View {
             .labelStyle(.iconOnly)
             .buttonStyle(.bordered)
             .controlSize(.large)
-            // The row reports a minimum far wider than it draws, which held the
-            // column (and the window) ~270pt wider than needed. It fits the
-            // detail column's own minimum width.
+            // The row reports a minimum far wider than it draws (~270pt more),
+            // which pushed the columns past the window's minimum width.
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         }
     }
