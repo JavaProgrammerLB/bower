@@ -4,6 +4,7 @@ import SwiftUI
 /// The right-hand list of videos for whatever the sidebar has selected.
 struct VideoListView: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         let videos = app.filteredVideos
@@ -16,7 +17,11 @@ struct VideoListView: View {
         VStack(spacing: 0) {
             header(count: app.displayedVideos.count, currentID: currentID)
                 .frame(height: max(geometry.safeAreaInsets.top, 44))
-            Divider()
+            // A one-pixel hairline, matching the toolbar separator it lines up
+            // with in the main area (Divider is a full point and darker).
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor))
+                .frame(height: 1 / displayScale)
             ScrollViewReader { proxy in
                 List {
                     ForEach(videos) { video in
