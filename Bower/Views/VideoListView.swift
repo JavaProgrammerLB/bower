@@ -10,8 +10,12 @@ struct VideoListView: View {
         let playingHere = app.playback.queueContext == app.selection
         let currentID = playingHere ? app.playback.current?.id : nil
 
+        // The header moves up into the toolbar band, which is otherwise empty
+        // apart from the toolbar buttons on its trailing side.
+        GeometryReader { geometry in
         VStack(spacing: 0) {
             header(count: app.displayedVideos.count, currentID: currentID)
+                .frame(height: max(geometry.safeAreaInsets.top, 44))
             Divider()
             ScrollViewReader { proxy in
                 List {
@@ -42,6 +46,8 @@ struct VideoListView: View {
                 .safeAreaBar(edge: .bottom) { FilterBar() }
             }
         }
+        .ignoresSafeArea(.container, edges: .top)
+        }
         .onDisappear { app.filter = "" }
     }
 
@@ -54,8 +60,8 @@ struct VideoListView: View {
     }
 
     private func header(count: Int, currentID: String?) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(app.displayedTitle)
                     .font(.headline)
                     .lineLimit(1)
@@ -64,15 +70,16 @@ struct VideoListView: View {
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
-            Spacer()
+            Spacer(minLength: 8)
             if app.selection == .history {
                 Button("Clear") { app.store.clearHistory() }
                     .controlSize(.small)
                     .disabled(app.store.watchHistory.isEmpty)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.leading, 14)
+        // Clear of the toolbar's search / video list capsule.
+        .padding(.trailing, 112)
     }
 
     private func positionText(count: Int, currentID: String?) -> String {
