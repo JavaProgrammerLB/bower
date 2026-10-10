@@ -115,6 +115,29 @@ private struct VideoHeader: View {
                 .controlGroupStyle(.navigation)
                 .fixedSize()
 
+                ControlGroup {
+                    Button { playback.shuffle.toggle() } label: {
+                        Label {
+                            Text("Shuffle")
+                        } icon: {
+                            Image(systemName: "shuffle")
+                                .foregroundStyle(playback.shuffle ? Color.accentColor : .primary)
+                        }
+                    }
+                    .help(playback.shuffle ? "Shuffle: On" : "Shuffle: Off")
+                    Button { playback.loopMode = playback.loopMode.next } label: {
+                        Label {
+                            Text("Repeat")
+                        } icon: {
+                            Image(systemName: playback.loopMode == .one ? "repeat.1" : "repeat")
+                                .foregroundStyle(playback.loopMode == .off ? Color.primary : Color.accentColor)
+                        }
+                    }
+                    .help(repeatHelp(playback.loopMode))
+                }
+                .controlGroupStyle(.navigation)
+                .fixedSize()
+
                 Spacer()
 
                 Button {
@@ -137,6 +160,14 @@ private struct VideoHeader: View {
             .labelStyle(.iconOnly)
             .buttonStyle(.bordered)
             .controlSize(.large)
+        }
+    }
+
+    private func repeatHelp(_ mode: LoopMode) -> String {
+        switch mode {
+        case .off: "Repeat: Off"
+        case .all: "Repeat: All"
+        case .one: "Repeat: One"
         }
     }
 }

@@ -213,31 +213,14 @@ struct VideoRow: View {
     }
 }
 
-/// Pinned to the bottom of the right sidebar: the filter field, plus
-/// shuffle and repeat.
+/// Narrows the video list; pinned to the bottom of the right sidebar.
 private struct FilterBar: View {
     @Environment(AppModel.self) private var app
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
-            filterField
-            HStack(spacing: 0) {
-                PlaybackModeButtons()
-            }
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 6)
-            .frame(height: 32)
-            .glassEffect(.regular.interactive(), in: .capsule)
-        }
-        .padding(.horizontal, 12)
-        .padding(.bottom, 12)
-        .padding(.top, 6)
-    }
-
-    private var filterField: some View {
         @Bindable var app = app
-        return HStack(spacing: 6) {
+        HStack(spacing: 6) {
             Image(systemName: "line.3.horizontal.decrease")
                 .foregroundStyle(.secondary)
             TextField("Filter", text: $app.filter)
@@ -261,41 +244,8 @@ private struct FilterBar: View {
         .padding(.horizontal, 12)
         .frame(height: 32)
         .glassEffect(.regular.interactive(), in: .capsule)
-    }
-}
-
-/// Shuffle and repeat, which apply to the queue being played.
-private struct PlaybackModeButtons: View {
-    @Environment(AppModel.self) private var app
-
-    var body: some View {
-        let playback = app.playback
-        Button {
-            playback.shuffle.toggle()
-        } label: {
-            Image(systemName: "shuffle")
-                .foregroundStyle(playback.shuffle ? Color.accentColor : .secondary)
-                .frame(width: 26, height: 22)
-                .contentShape(Rectangle())
-        }
-        .help(playback.shuffle ? "Shuffle: On" : "Shuffle: Off")
-
-        Button {
-            playback.loopMode = playback.loopMode.next
-        } label: {
-            Image(systemName: playback.loopMode == .one ? "repeat.1" : "repeat")
-                .foregroundStyle(playback.loopMode == .off ? Color.secondary : Color.accentColor)
-                .frame(width: 26, height: 22)
-                .contentShape(Rectangle())
-        }
-        .help(repeatHelp(playback.loopMode))
-    }
-
-    private func repeatHelp(_ mode: LoopMode) -> String {
-        switch mode {
-        case .off: "Repeat: Off"
-        case .all: "Repeat: All"
-        case .one: "Repeat: One"
-        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+        .padding(.top, 6)
     }
 }
