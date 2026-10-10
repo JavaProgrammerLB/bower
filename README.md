@@ -21,3 +21,13 @@ open Bower.xcodeproj
 - `Views/` — sidebar, now-playing pane, video list inspector, sheets, settings
 
 Data lives in `~/Library/Application Support/me.limboy.Bower/`.
+
+## Release
+
+```sh
+scripts/release.sh 2.1.0 [notes.md]
+```
+
+Bumps the version, tags `v2.1.0` and pushes. `.github/workflows/release.yml` then builds,
+signs, notarizes and publishes the DMG, the zip and Sparkle's `appcast.xml` as a GitHub
+release; the app checks `releases/latest/download/appcast.xml` for updates.

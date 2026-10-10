@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct BowerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel()
+    @State private var updater = Updater()
     @AppStorage("theme") private var theme: Theme = .system
 
     var body: some Scene {
@@ -55,7 +56,7 @@ struct BowerApp: App {
                 .onChange(of: theme) { _, theme in NSApp.appearance = theme.appearance }
         }
         .defaultSize(width: 1280, height: 800)
-        .commands { AppCommands(model: model) }
+        .commands { AppCommands(model: model, updater: updater) }
 
         Settings {
             SettingsView()

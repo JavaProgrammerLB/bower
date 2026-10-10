@@ -4,6 +4,10 @@ options:
   deploymentTarget:
     macOS: "26.0"
   createIntermediateGroups: true
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.10.0
 
 settings:
   base:
@@ -11,6 +15,8 @@ settings:
     SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
     SWIFT_APPROACHABLE_CONCURRENCY: YES
     MACOSX_DEPLOYMENT_TARGET: "26.0"
+    MARKETING_VERSION: "2.0.0"
+    CURRENT_PROJECT_VERSION: "1"
 
 targets:
   Bower:
@@ -18,14 +24,21 @@ targets:
     platform: macOS
     sources:
       - path: Bower
+      # An Icon Composer icon; actool compiles it into the app icon.
       - path: assets/app.icon
+        type: file
+        buildPhase: resources
+    dependencies:
+      - package: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.limboy.Bower
         PRODUCT_NAME: Bower
-        MARKETING_VERSION: "2.0.0"
-        CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
+        # Sparkle's keys, merged into the generated Info.plist.
+        INFOPLIST_FILE: Bower/Info.plist
+        # Each GitHub release carries its own appcast.xml (scripts/release.sh).
+        SPARKLE_FEED_URL: https://github.com/limboy/bower/releases/latest/download/appcast.xml
         INFOPLIST_KEY_CFBundleDisplayName: Bower
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.entertainment
         INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026 Limboy"
@@ -35,3 +48,10 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         COMBINE_HIDPI_IMAGES: YES
         ENABLE_USER_SCRIPT_SANDBOXING: YES
+      configs:
+        # Builds run from Xcode never offer to replace themselves; the menu
+        # item still checks.
+        Debug:
+          SPARKLE_AUTOMATIC_CHECKS: NO
+        Release:
+          SPARKLE_AUTOMATIC_CHECKS: YES

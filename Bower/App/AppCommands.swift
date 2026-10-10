@@ -2,9 +2,15 @@ import SwiftUI
 
 struct AppCommands: Commands {
     let model: AppModel
+    let updater: Updater
     @AppStorage("alwaysOnTop") private var alwaysOnTop = false
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") { updater.checkForUpdates() }
+                .disabled(!updater.canCheckForUpdates)
+        }
+
         CommandGroup(replacing: .newItem) {
             Button("Add Playlist, Channel, or Video…") { model.activeSheet = .add }
                 .keyboardShortcut("n")
