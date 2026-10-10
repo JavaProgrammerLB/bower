@@ -195,6 +195,19 @@ nonisolated final class InnerTubeClient: Sendable {
         return VideoDetails(video: video, description: details["shortDescription"] as? String ?? "")
     }
 
+    /// Whether YouTube refuses this video because it's for channel members.
+    /// Asked with the user's cookie, so a member gets `false`. Lists already
+    /// leave such videos out, but one saved while public can turn
+    /// members-only later.
+    @concurrent
+    func isMembersOnly(videoID: String) async -> Bool {
+        guard let json = try? await post("player", body: ["videoId": videoID]),
+              let status = JSONNode.value(json, "playabilityStatus") as? [String: Any],
+              status["status"] as? String != "OK"
+        else { return false }
+        return JSONNode.string(status, "errorScreen", "playerLegacyDesktopYpcOfferRenderer", "offerId") == "sponsors_only_video"
+    }
+
     @concurrent
     func description(videoID: String) async -> String {
         if let details = try? await video(id: videoID), !details.description.isEmpty {

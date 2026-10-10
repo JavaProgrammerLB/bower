@@ -26,6 +26,7 @@ final class PlaybackModel {
     @ObservationIgnored private var shuffledIDs: [String] = []
     @ObservationIgnored private var lastPositionSave = Date.distantPast
     @ObservationIgnored private var descriptionTask: Task<Void, Never>?
+    @ObservationIgnored private var membersCheckTask: Task<Void, Never>?
 
     init(store: LibraryStore) {
         self.store = store
@@ -65,6 +66,22 @@ final class PlaybackModel {
         current = video
         player.load(videoID: video.id, startAt: resume, autoplay: autoplay)
         loadDescription(for: video.id)
+        checkMembersOnly(video.id, autoplay: autoplay)
+    }
+
+    /// The embed shows its own "Members-only content" screen and reports no
+    /// error, so ask YouTube directly; such a video leaves the library and
+    /// playback moves on.
+    private func checkMembersOnly(_ videoID: String, autoplay: Bool) {
+        membersCheckTask?.cancel()
+        membersCheckTask = Task {
+            guard await InnerTubeClient.shared.isMembersOnly(videoID: videoID),
+                  !Task.isCancelled, current?.id == videoID
+            else { return }
+            let following = nextVideo(wrapping: true)
+            store.removeVideo(videoID)
+            if let following, following.id != videoID { start(following, autoplay: autoplay) }
+        }
     }
 
     // MARK: Transport

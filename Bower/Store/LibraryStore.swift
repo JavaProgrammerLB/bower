@@ -135,6 +135,21 @@ final class LibraryStore {
         scheduleLibrarySave()
     }
 
+    /// Drops one video from every playlist and channel holding it.
+    func removeVideo(_ videoID: String) {
+        func strip(_ list: inout [Source]) -> Bool {
+            var changed = false
+            for index in list.indices where list[index].items.contains(where: { $0.id == videoID }) {
+                list[index].items.removeAll { $0.id == videoID }
+                changed = true
+            }
+            return changed
+        }
+        let changedPlaylists = strip(&playlists)
+        let changedChannels = strip(&channels)
+        if changedPlaylists || changedChannels { scheduleLibrarySave() }
+    }
+
     func remove(_ ref: SourceRef) {
         if ref.type == .playlist { playlists.removeAll { $0.id == ref.id } } else { channels.removeAll { $0.id == ref.id } }
         removeFromOrder(ref)
