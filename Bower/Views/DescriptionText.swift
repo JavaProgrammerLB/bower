@@ -42,20 +42,18 @@ struct DescriptionText: NSViewRepresentable {
         context.coordinator.onSeek = onSeek
         if context.coordinator.text != text {
             context.coordinator.text = text
-            textView.textStorage?.setAttributedString(Self.attributed(text))
+            let attributed = Self.attributed(text)
+            textView.textStorage?.setAttributedString(attributed)
+            context.coordinator.measuringStorage.setAttributedString(attributed)
         }
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView textView: NSTextView, context: Context) -> CGSize? {
         // Report nothing for the min/max probes so the column's size limits
         // never depend on the description.
-        guard let width = proposal.width, width > 0, width.isFinite,
-              let container = textView.textContainer, let layout = textView.layoutManager
+        guard let width = proposal.width, width > 0, width.isFinite
         else { return CGSize(width: 0, height: 0) }
-        container.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
-        layout.ensureLayout(for: container)
-        let height = ceil(layout.usedRect(for: container).height)
-        return CGSize(width: width, height: height)
+        return CGSize(width: width, height: context.coordinator.height(forWidth: width))
     }
 
     private static func attributed(_ text: String) -> NSAttributedString {
@@ -83,6 +81,26 @@ struct DescriptionText: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var text: String?
         var onSeek: (Int) -> Void = { _ in }
+
+        // Measured on a separate text stack: SwiftUI probes several widths
+        // and doesn't always resize the view after the last one, so sizing
+        // the view's own container here left it at a probe width (text
+        // wrapped a character or two per line).
+        let measuringStorage = NSTextStorage()
+        private let measuringLayout = NSLayoutManager()
+        private let measuringContainer = NSTextContainer()
+
+        override init() {
+            measuringContainer.lineFragmentPadding = 0
+            measuringLayout.addTextContainer(measuringContainer)
+            measuringStorage.addLayoutManager(measuringLayout)
+        }
+
+        func height(forWidth width: CGFloat) -> CGFloat {
+            measuringContainer.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
+            measuringLayout.ensureLayout(for: measuringContainer)
+            return ceil(measuringLayout.usedRect(for: measuringContainer).height)
+        }
 
         func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
             guard let url = link as? URL ?? (link as? String).flatMap(URL.init(string:)) else { return false }
