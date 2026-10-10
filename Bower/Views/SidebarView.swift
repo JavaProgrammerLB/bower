@@ -52,7 +52,6 @@ struct SidebarView: View {
                 Label("Latest", systemImage: "sparkles.tv")
                     .tag(LibrarySelection.latest)
                 Label("Bookmarks", systemImage: "bookmark")
-                    .badge(store.bookmarks.count)
                     .tag(LibrarySelection.bookmarks)
                 Label("History", systemImage: "clock.arrow.circlepath")
                     .tag(LibrarySelection.history)
