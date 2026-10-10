@@ -411,7 +411,7 @@ private struct FolderDropMarker: NSViewRepresentable {
     func updateNSView(_ view: MarkerView, context: Context) { view.folderID = folderID }
 }
 
-/// Puts `FolderDropProxy` in front of the sidebar outline view's data source.
+/// Routes the sidebar outline view's drops through `FolderDropProxy`.
 ///
 /// A SwiftUI `.onDrop` on a row is a separate drop target inside the outline
 /// view, so the drag kept switching between it and the list's own reordering,
@@ -435,63 +435,70 @@ private struct FolderDropInstaller: NSViewRepresentable {
     }
 }
 
-private final class FolderDropProxy: NSObject, NSOutlineViewDataSource {
+/// Intercepts drops onto folder headers and hands everything else to
+/// SwiftUI's reordering.
+///
+/// SwiftUI's data source has to stay the outline view's `dataSource`: putting
+/// another object there broke the rows' context menus. So instead the data
+/// source is moved onto a runtime subclass of its own class that overrides
+/// just the two drop methods.
+private final class FolderDropProxy: NSObject {
     private static var key: UInt8 = 0
+    private static var subclasses: [ObjectIdentifier: AnyClass] = [:]
 
-    /// SwiftUI's own data source; everything that isn't a folder drop goes here.
-    nonisolated(unsafe) weak var target: (NSObject & NSOutlineViewDataSource)?
     var canDrop: ((SourceRef, String) -> Bool)?
     var onDrop: ((SourceRef, String) -> Bool)?
 
+    private typealias ValidateDrop = @convention(c) (AnyObject, Selector, NSOutlineView, NSDraggingInfo, AnyObject?, Int) -> NSDragOperation
+    private typealias AcceptDrop = @convention(c) (AnyObject, Selector, NSOutlineView, NSDraggingInfo, AnyObject?, Int) -> Bool
+
+    private static let validateSelector = #selector(NSOutlineViewDataSource.outlineView(_:validateDrop:proposedItem:proposedChildIndex:))
+    private static let acceptSelector = #selector(NSOutlineViewDataSource.outlineView(_:acceptDrop:item:childIndex:))
+
     static func install(on outline: NSOutlineView) -> FolderDropProxy {
         let proxy = objc_getAssociatedObject(outline, &key) as? FolderDropProxy ?? FolderDropProxy()
-        // The outline view holds its data source weakly; tie the proxy's
-        // lifetime to it instead.
         objc_setAssociatedObject(outline, &key, proxy, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        if outline.dataSource !== proxy, let current = outline.dataSource as? NSObject & NSOutlineViewDataSource {
-            proxy.target = current
-            outline.dataSource = proxy
+        if let dataSource = outline.dataSource as? NSObject, let subclass = subclass(of: object_getClass(dataSource)!) {
+            object_setClass(dataSource, subclass)
         }
         return proxy
     }
 
-    nonisolated override func responds(to selector: Selector!) -> Bool {
-        super.responds(to: selector) || (target?.responds(to: selector) ?? false)
-    }
+    /// The drop-intercepting subclass for `base`, or nil when `base` already is one.
+    private static func subclass(of base: AnyClass) -> AnyClass? {
+        if subclasses.values.contains(where: { $0 == base }) { return nil }
+        if let existing = subclasses[ObjectIdentifier(base)] { return existing }
 
-    nonisolated override func forwardingTarget(for selector: Selector!) -> Any? { target }
+        let name = "BowerFolderDrop_\(NSStringFromClass(base))"
+        guard let subclass = objc_allocateClassPair(base, name, 0),
+              let validate = class_getInstanceMethod(base, validateSelector),
+              let accept = class_getInstanceMethod(base, acceptSelector) else { return nil }
+        let originalValidate = unsafeBitCast(method_getImplementation(validate), to: ValidateDrop.self)
+        let originalAccept = unsafeBitCast(method_getImplementation(accept), to: AcceptDrop.self)
 
-    // Every data source method the outline view needs is forwarded; only the
-    // drop methods are implemented here so they can be intercepted.
-
-    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
-        target?.outlineView?(outlineView, numberOfChildrenOfItem: item) ?? 0
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
-        target!.outlineView!(outlineView, child: index, ofItem: item)
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
-        target?.outlineView?(outlineView, isItemExpandable: item) ?? false
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo,
-                     proposedItem item: Any?, proposedChildIndex index: Int) -> NSDragOperation {
-        if let (row, _) = folderTarget(outlineView, info) {
-            outlineView.setDropItem(outlineView.item(atRow: row), dropChildIndex: NSOutlineViewDropOnItemIndex)
-            return .move
+        let validateBlock: @convention(block) (AnyObject, NSOutlineView, NSDraggingInfo, AnyObject?, Int) -> NSDragOperation = { source, outline, info, item, index in
+            if let proxy = objc_getAssociatedObject(outline, &key) as? FolderDropProxy,
+               let (row, _) = proxy.folderTarget(outline, info) {
+                outline.setDropItem(outline.item(atRow: row), dropChildIndex: NSOutlineViewDropOnItemIndex)
+                return .move
+            }
+            return originalValidate(source, validateSelector, outline, info, item, index)
         }
-        return target?.outlineView?(outlineView, validateDrop: info, proposedItem: item, proposedChildIndex: index) ?? []
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo,
-                     item: Any?, childIndex index: Int) -> Bool {
-        if index == NSOutlineViewDropOnItemIndex, let (_, folderID) = folderTarget(outlineView, info),
-           let ref = draggedSource(info) {
-            return onDrop?(ref, folderID) ?? false
+        let acceptBlock: @convention(block) (AnyObject, NSOutlineView, NSDraggingInfo, AnyObject?, Int) -> Bool = { source, outline, info, item, index in
+            if index == NSOutlineViewDropOnItemIndex,
+               let proxy = objc_getAssociatedObject(outline, &key) as? FolderDropProxy,
+               let (_, folderID) = proxy.folderTarget(outline, info),
+               let ref = proxy.draggedSource(info) {
+                return proxy.onDrop?(ref, folderID) ?? false
+            }
+            return originalAccept(source, acceptSelector, outline, info, item, index)
         }
-        return target?.outlineView?(outlineView, acceptDrop: info, item: item, childIndex: index) ?? false
+        class_addMethod(subclass, validateSelector, imp_implementationWithBlock(validateBlock), method_getTypeEncoding(validate))
+        class_addMethod(subclass, acceptSelector, imp_implementationWithBlock(acceptBlock), method_getTypeEncoding(accept))
+        objc_registerClassPair(subclass)
+
+        subclasses[ObjectIdentifier(base)] = subclass
+        return subclass
     }
 
     /// The folder header under the pointer, when a source is being dragged.
