@@ -236,6 +236,8 @@ private struct SearchResult: Identifiable {
     var selection: LibrarySelection
     var sourceTitle: String
     var icon: String
+    /// Lowercased title and source, matched against the query.
+    var haystack: String
     var id: String { "\(video.id)-\(sourceTitle)" }
 }
 
@@ -245,18 +247,18 @@ struct SearchSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var index: [SearchResult] = []
+    @State private var results: [SearchResult] = []
     @State private var highlighted: String?
     @FocusState private var fieldFocused: Bool
     @State private var sheetWindow: NSWindow?
     @State private var clickMonitor: Any?
 
-    private var results: [SearchResult] {
+    private func search(_ query: String) -> [SearchResult] {
         let terms = query.lowercased().split(separator: " ")
         guard !terms.isEmpty else { return [] }
         var hits: [SearchResult] = []
         for item in index {
-            let haystack = "\(item.video.title) \(item.sourceTitle)".lowercased()
-            if terms.allSatisfy({ haystack.contains($0) }) {
+            if terms.allSatisfy({ item.haystack.contains($0) }) {
                 hits.append(item)
                 if hits.count == 60 { break }
             }
@@ -265,7 +267,6 @@ struct SearchSheet: View {
     }
 
     var body: some View {
-        let results = results
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
@@ -278,7 +279,10 @@ struct SearchSheet: View {
                     .onSubmit { if let pick = results.first(where: { $0.id == highlighted }) ?? results.first { open(pick) } }
                     .onKeyPress(.downArrow) { moveHighlight(1, in: results); return .handled }
                     .onKeyPress(.upArrow) { moveHighlight(-1, in: results); return .handled }
-                    .onChange(of: query) { highlighted = self.results.first?.id }
+                    .onChange(of: query) {
+                        results = search(query)
+                        highlighted = results.first?.id
+                    }
             }
             .padding(16)
 
@@ -373,12 +377,14 @@ struct SearchSheet: View {
                 for video in source.items where seen.insert(video.id).inserted {
                     items.append(SearchResult(video: video, selection: LibrarySelection(SourceRef(type: kind, id: source.id)),
                                               sourceTitle: source.title,
-                                              icon: kind == .playlist ? "list.and.film" : "person.crop.circle"))
+                                              icon: kind == .playlist ? "list.and.film" : "person.crop.circle",
+                                              haystack: "\(video.title) \(source.title)".lowercased()))
                 }
             }
         }
         for video in store.videos(for: .bookmarks) where seen.insert(video.id).inserted {
-            items.append(SearchResult(video: video, selection: .bookmarks, sourceTitle: "Bookmarks", icon: "bookmark"))
+            items.append(SearchResult(video: video, selection: .bookmarks, sourceTitle: "Bookmarks", icon: "bookmark",
+                                      haystack: "\(video.title) bookmarks".lowercased()))
         }
         index = items
     }

@@ -9,7 +9,9 @@ final class PlaybackModel {
     let player = YouTubePlayer()
 
     private(set) var current: Video?
-    private(set) var queue: [Video] = []
+    private(set) var queue: [Video] = [] {
+        didSet { cachedOrder = nil }
+    }
     private(set) var queueContext: LibrarySelection?
 
     var shuffle = false {
@@ -23,10 +25,13 @@ final class PlaybackModel {
     @ObservationIgnored private let store: LibraryStore
     @ObservationIgnored private let positions = PlaybackPositions()
     @ObservationIgnored private let descriptions = DescriptionCache()
-    @ObservationIgnored private var shuffledIDs: [String] = []
+    @ObservationIgnored private var shuffledIDs: [String] = [] {
+        didSet { cachedOrder = nil }
+    }
+    /// `order`, kept because views ask `canGoNext` on every redraw.
+    @ObservationIgnored private var cachedOrder: [Video]?
     @ObservationIgnored private var lastPositionSave = Date.distantPast
-    @ObservationIgnored private var descriptionTask: Task<Void, Never>?
-    @ObservationIgnored private var membersCheckTask: Task<Void, Never>?
+    @ObservationIgnored private var inspectTask: Task<Void, Never>?
 
     init(store: LibraryStore) {
         self.store = store
@@ -55,9 +60,10 @@ final class PlaybackModel {
         queue = list
         if shuffle {
             let ids = Set(list.map(\.id))
-            shuffledIDs.removeAll { !ids.contains($0) }
-            let missing = list.map(\.id).filter { !shuffledIDs.contains($0) }.shuffled()
-            shuffledIDs.append(contentsOf: missing)
+            var kept = shuffledIDs.filter { ids.contains($0) }
+            let placed = Set(kept)
+            kept.append(contentsOf: list.map(\.id).filter { !placed.contains($0) }.shuffled())
+            shuffledIDs = kept
         }
     }
 
@@ -65,22 +71,35 @@ final class PlaybackModel {
         let resume = positions.position(for: video.id)
         current = video
         player.load(videoID: video.id, startAt: resume, autoplay: autoplay)
-        loadDescription(for: video.id)
-        checkMembersOnly(video.id, autoplay: autoplay)
+        inspect(video.id, autoplay: autoplay)
     }
 
-    /// The embed shows its own "Members-only content" screen and reports no
-    /// error, so ask YouTube directly; such a video leaves the library and
-    /// playback moves on.
-    private func checkMembersOnly(_ videoID: String, autoplay: Bool) {
-        membersCheckTask?.cancel()
-        membersCheckTask = Task {
-            guard await InnerTubeClient.shared.isMembersOnly(videoID: videoID),
-                  !Task.isCancelled, current?.id == videoID
-            else { return }
-            let following = nextVideo(wrapping: true)
-            store.removeVideo(videoID)
-            if let following, following.id != videoID { start(following, autoplay: autoplay) }
+    /// One `player` request both checks for members-only videos and fetches
+    /// the description. The embed shows its own "Members-only content" screen
+    /// and reports no error, so YouTube is asked directly; such a video leaves
+    /// the library and playback moves on.
+    private func inspect(_ videoID: String, autoplay: Bool) {
+        inspectTask?.cancel()
+        let cached = descriptions.cached(videoID)
+        descriptionText = cached ?? ""
+        isLoadingDescription = cached == nil
+        inspectTask = Task {
+            let client = InnerTubeClient.shared
+            let info = await client.playerInfo(videoID: videoID)
+            guard !Task.isCancelled, current?.id == videoID else { return }
+            if info.isMembersOnly {
+                let following = nextVideo(wrapping: true)
+                store.removeVideo(videoID)
+                if let following, following.id != videoID { start(following, autoplay: autoplay) }
+                return
+            }
+            guard cached == nil else { return }
+            var text = info.description
+            if text.isEmpty { text = await client.nextDescription(videoID: videoID) }
+            guard !Task.isCancelled, current?.id == videoID else { return }
+            descriptions.store(text, for: videoID)
+            descriptionText = text
+            isLoadingDescription = false
         }
     }
 
@@ -114,9 +133,16 @@ final class PlaybackModel {
     }
 
     private var order: [Video] {
-        guard shuffle else { return queue }
-        let byID = Dictionary(queue.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        return shuffledIDs.compactMap { byID[$0] }
+        if let cachedOrder { return cachedOrder }
+        let built: [Video]
+        if shuffle {
+            let byID = Dictionary(queue.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            built = shuffledIDs.compactMap { byID[$0] }
+        } else {
+            built = queue
+        }
+        cachedOrder = built
+        return built
     }
 
     private func nextVideo(wrapping: Bool) -> Video? {
@@ -176,24 +202,11 @@ final class PlaybackModel {
         if video.id == current?.id, player.isPlaying { next() }
     }
 
-    // MARK: Description
-
-    private func loadDescription(for videoID: String) {
-        descriptionTask?.cancel()
-        descriptionText = ""
-        isLoadingDescription = true
-        descriptionTask = Task {
-            let text = await descriptions.description(for: videoID)
-            guard !Task.isCancelled, current?.id == videoID else { return }
-            descriptionText = text
-            isLoadingDescription = false
-        }
-    }
-
     func flush() {
         if let current, player.duration > 0 {
             positions.save(current.id, position: player.currentTime, duration: player.duration)
         }
         positions.flush()
+        descriptions.flush()
     }
 }

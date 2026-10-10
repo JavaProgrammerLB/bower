@@ -31,8 +31,9 @@ final class LibraryStore {
         didSet { scheduleUserSave(changedVideos: false) }
     }
 
-    /// Bumped whenever any source's videos change, so derived lists (Latest,
-    /// folders) know to rebuild without diffing thousands of videos.
+    /// Bumped whenever any source's videos or a folder's members change, so
+    /// derived lists (Latest, folders) know to rebuild without diffing
+    /// thousands of videos. Renaming or collapsing a folder leaves it alone.
     private(set) var contentRevision = 0
     /// Bumped when bookmarks, history or hidden videos change.
     private(set) var userRevision = 0
@@ -46,6 +47,9 @@ final class LibraryStore {
             channels = file.channels
             folders = file.folders
             sidebarOrder = file.sidebarOrder
+            // Only with a library to compare against: pruning against an
+            // empty one would delete every avatar.
+            AvatarCache.prune(keeping: channels.compactMap(\.thumbnail))
         }
         if let user = JSONFile.read(UserFile.self, from: AppPaths.userData) {
             bookmarks = Dictionary(user.bookmarks.map { ($0.videoID, $0) }, uniquingKeysWith: { a, _ in a })
@@ -54,13 +58,12 @@ final class LibraryStore {
             lastRefresh = user.lastRefresh.map { Date(timeIntervalSince1970: $0 / 1000) }
         }
         if reconcileSidebarOrder() { scheduleLibrarySave() }
-        AvatarCache.prune(keeping: channels.compactMap(\.thumbnail))
     }
 
     // MARK: Persistence
 
-    private func scheduleLibrarySave() {
-        contentRevision += 1
+    private func scheduleLibrarySave(contentChanged: Bool = true) {
+        if contentChanged { contentRevision += 1 }
         librarySaveTask?.cancel()
         let snapshot = LibraryFile(playlists: playlists, channels: channels, folders: folders, sidebarOrder: sidebarOrder)
         librarySaveTask = Task {
@@ -163,20 +166,20 @@ final class LibraryStore {
         let folder = Folder(id: UUID().uuidString.lowercased(), name: name, isCollapsed: false)
         folders.append(folder)
         sidebarOrder.append(.folder(id: folder.id, children: []))
-        scheduleLibrarySave()
+        scheduleLibrarySave(contentChanged: false)
         return folder
     }
 
     func renameFolder(_ id: String, to name: String) {
         guard let index = folders.firstIndex(where: { $0.id == id }) else { return }
         folders[index].name = name
-        scheduleLibrarySave()
+        scheduleLibrarySave(contentChanged: false)
     }
 
     func setFolderCollapsed(_ id: String, _ collapsed: Bool) {
         guard let index = folders.firstIndex(where: { $0.id == id }) else { return }
         folders[index].isCollapsed = collapsed
-        scheduleLibrarySave()
+        scheduleLibrarySave(contentChanged: false)
     }
 
     /// Deletes a folder. Its playlists and channels are either deleted with it
@@ -348,7 +351,7 @@ final class LibraryStore {
     func videos(for selection: LibrarySelection) -> [Video] {
         switch selection {
         case .latest:
-            return Array(merged(channels + playlists).prefix(100))
+            return newest(channels + playlists, limit: 100)
         case .folder(let id):
             let refs = folderChildren(id)
             return merged(refs.compactMap { source($0) })
@@ -386,6 +389,33 @@ final class LibraryStore {
             }
         }
         return all.sorted { ($0.publishedAt ?? 0) > ($1.publishedAt ?? 0) }
+    }
+
+    /// The `limit` newest videos of the given sources. Only each source's own
+    /// newest `limit` can make the cut, so the full library is never sorted.
+    private func newest(_ sources: [Source], limit: Int) -> [Video] {
+        var candidates: [(date: Double, source: Int, item: Int)] = []
+        for (sourceIndex, source) in sources.enumerated() {
+            var local = source.items.indices.map { (date: source.items[$0].publishedAt ?? 0, source: sourceIndex, item: $0) }
+            if local.count > limit {
+                local.sort { $0.date > $1.date }
+                local.removeLast(local.count - limit)
+            }
+            candidates += local
+        }
+        candidates.sort { $0.date > $1.date }
+
+        var seen = Set<String>()
+        var result: [Video] = []
+        for candidate in candidates {
+            let source = sources[candidate.source]
+            var video = source.items[candidate.item]
+            guard seen.insert(video.id).inserted else { continue }
+            video.sourceTitle = video.sourceTitle ?? source.title
+            result.append(video)
+            if result.count == limit { break }
+        }
+        return result
     }
 
     func title(for selection: LibrarySelection) -> String {

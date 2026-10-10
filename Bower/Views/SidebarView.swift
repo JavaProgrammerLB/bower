@@ -309,7 +309,7 @@ private struct SourceLabel: View {
                 }
             }
         } icon: {
-            RemoteImage(url: source.thumbnail) {
+            RemoteImage(url: source.thumbnail, maxPixelSize: 64) {
                 Image(systemName: kind == .channel ? "person.crop.circle.fill" : "list.and.film")
                     .foregroundStyle(.secondary)
             }

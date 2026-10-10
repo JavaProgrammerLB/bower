@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import SwiftUI
 
 /// Channel avatars live on disk so the sidebar renders offline and does not
@@ -55,7 +56,8 @@ nonisolated enum AvatarCache {
 }
 
 /// Loads thumbnails and avatars, with an in-memory cache in front of a disk
-/// URL cache.
+/// URL cache. Images are decoded off the main thread, so scrolling never
+/// waits on JPEG decoding.
 final class ImageLoader {
     static let shared = ImageLoader()
 
@@ -64,7 +66,8 @@ final class ImageLoader {
     private var inFlight: [String: Task<NSImage?, Never>] = [:]
 
     private init() {
-        memory.countLimit = 800
+        // Costs are decoded bytes (a 480×360 thumbnail is ~0.7 MB).
+        memory.totalCostLimit = 200 << 20
         let config = URLSessionConfiguration.default
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appending(path: "BowerImages")
@@ -73,37 +76,60 @@ final class ImageLoader {
         session = URLSession(configuration: config)
     }
 
-    func cached(_ key: String) -> NSImage? {
-        memory.object(forKey: key as NSString)
+    private static func key(_ url: String, _ maxPixelSize: Int?) -> String {
+        maxPixelSize.map { "\(url)#\($0)" } ?? url
     }
 
-    func image(for key: String) async -> NSImage? {
-        if let hit = cached(key) { return hit }
+    func cached(_ url: String, maxPixelSize: Int? = nil) -> NSImage? {
+        memory.object(forKey: Self.key(url, maxPixelSize) as NSString)
+    }
+
+    /// `maxPixelSize` shrinks the image on decode; nil keeps its full size.
+    func image(for url: String, maxPixelSize: Int? = nil) async -> NSImage? {
+        let key = Self.key(url, maxPixelSize)
+        if let hit = memory.object(forKey: key as NSString) { return hit }
         if let task = inFlight[key] { return await task.value }
 
         let session = session
         let task = Task<NSImage?, Never> {
-            let data: Data?
-            if let file = AvatarCache.fileURL(for: key) {
-                data = try? Data(contentsOf: file)
-            } else if let url = URL(string: key) {
-                data = try? await session.data(from: url).0
-            } else {
-                data = nil
-            }
-            return data.flatMap(NSImage.init(data:))
+            guard let cgImage = await Self.load(url, session: session, maxPixelSize: maxPixelSize) else { return nil }
+            let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+            memory.setObject(image, forKey: key as NSString, cost: cgImage.bytesPerRow * cgImage.height)
+            return image
         }
         inFlight[key] = task
         let image = await task.value
         inFlight[key] = nil
-        if let image { memory.setObject(image, forKey: key as NSString) }
         return image
+    }
+
+    @concurrent
+    private static func load(_ url: String, session: URLSession, maxPixelSize: Int?) async -> CGImage? {
+        let data: Data?
+        if let file = AvatarCache.fileURL(for: url) {
+            data = try? Data(contentsOf: file)
+        } else if let remote = URL(string: url) {
+            data = try? await session.data(from: remote).0
+        } else {
+            data = nil
+        }
+        guard let data, let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        var options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            // Decode now, here, rather than lazily on the main thread at draw time.
+            kCGImageSourceShouldCacheImmediately: true,
+        ]
+        if let maxPixelSize { options[kCGImageSourceThumbnailMaxPixelSize] = maxPixelSize }
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 }
 
 struct RemoteImage<Placeholder: View>: View {
     let url: String?
     var contentMode: ContentMode = .fill
+    /// For images drawn small, such as avatars: decode at most this many pixels across.
+    var maxPixelSize: Int?
     @ViewBuilder var placeholder: () -> Placeholder
 
     @State private var image: NSImage?
@@ -123,12 +149,12 @@ struct RemoteImage<Placeholder: View>: View {
                 image = nil
                 return
             }
-            if let hit = ImageLoader.shared.cached(url) {
+            if let hit = ImageLoader.shared.cached(url, maxPixelSize: maxPixelSize) {
                 image = hit
                 return
             }
             image = nil
-            image = await ImageLoader.shared.image(for: url)
+            image = await ImageLoader.shared.image(for: url, maxPixelSize: maxPixelSize)
         }
     }
 }

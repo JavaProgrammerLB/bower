@@ -24,16 +24,15 @@ final class AppModel {
     }
 
     /// Narrows the visible list (grid and video list alike).
-    var filter = ""
-
-    var filteredVideos: [Video] {
-        let terms = filter.lowercased().split(separator: " ")
-        guard !terms.isEmpty else { return displayedVideos }
-        return displayedVideos.filter { video in
-            let haystack = "\(video.title) \(video.sourceTitle ?? "")".lowercased()
-            return terms.allSatisfy { haystack.contains($0) }
-        }
+    var filter = "" {
+        didSet { if filter != oldValue { applyFilter() } }
     }
+
+    private(set) var filteredVideos: [Video] = []
+
+    /// Lowercased title + source per displayed video, built on first use of
+    /// the filter so typing doesn't redo it for every video on each key.
+    @ObservationIgnored private var haystacks: [String]?
 
     /// The main area shows either the selected list as a grid of videos or,
     /// once a video is picked, the player with the list alongside it.
@@ -63,9 +62,24 @@ final class AppModel {
 
     func reloadDisplayed() {
         displayedVideos = selection.map { store.videos(for: $0) } ?? []
+        haystacks = nil
+        applyFilter()
     }
 
-    /// The library changed underneath: rebuild what is shown and the queue.
+    private func applyFilter() {
+        let terms = filter.lowercased().split(separator: " ")
+        guard !terms.isEmpty else {
+            filteredVideos = displayedVideos
+            return
+        }
+        let haystacks = haystacks ?? displayedVideos.map { "\($0.title) \($0.sourceTitle ?? "")".lowercased() }
+        self.haystacks = haystacks
+        filteredVideos = zip(displayedVideos, haystacks).compactMap { video, haystack in
+            terms.allSatisfy { haystack.contains($0) } ? video : nil
+        }
+    }
+
+    /// Sources' videos changed underneath: rebuild what is shown and the queue.
     func libraryChanged() {
         reloadDisplayed()
         if let selection, store.isMissing(selection) {
@@ -73,6 +87,16 @@ final class AppModel {
             return
         }
         if let context = playback.queueContext {
+            let list = context == selection ? displayedVideos : store.videos(for: context)
+            playback.libraryChanged(list, context: context)
+        }
+    }
+
+    /// Bookmarks or history changed: only those two lists depend on them.
+    func userDataChanged() {
+        let dependent: Set<LibrarySelection> = [.bookmarks, .history]
+        if let selection, dependent.contains(selection) { reloadDisplayed() }
+        if let context = playback.queueContext, dependent.contains(context) {
             let list = context == selection ? displayedVideos : store.videos(for: context)
             playback.libraryChanged(list, context: context)
         }

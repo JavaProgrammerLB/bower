@@ -22,13 +22,27 @@ nonisolated enum AppPaths {
 }
 
 nonisolated enum JSONFile {
+    /// Reads and decodes `url`. A file that exists but can't be decoded is
+    /// moved aside first (`library.corrupt-<date>.json`), so the next save
+    /// can't overwrite the only copy of the user's data.
     static func read<T: Decodable>(_ type: T.Type, from url: URL) -> T? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
             print("[store] could not decode \(url.lastPathComponent): \(error)")
+            quarantine(url)
             return nil
+        }
+    }
+
+    private static func quarantine(_ url: URL) {
+        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let name = "\(url.deletingPathExtension().lastPathComponent).corrupt-\(stamp).\(url.pathExtension)"
+        do {
+            try FileManager.default.moveItem(at: url, to: url.deletingLastPathComponent().appending(path: name))
+        } catch {
+            print("[store] could not move aside \(url.lastPathComponent): \(error)")
         }
     }
 

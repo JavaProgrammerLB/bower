@@ -20,6 +20,11 @@ nonisolated struct PlaylistSnapshot: Sendable {
     var videos: [Video]
 }
 
+nonisolated struct PlayerInfo: Sendable {
+    var isMembersOnly = false
+    var description = ""
+}
+
 nonisolated struct VideoDetails: Sendable {
     var video: Video
     var description: String
@@ -140,7 +145,8 @@ nonisolated final class InnerTubeClient: Sendable {
         return ChannelSnapshot(
             id: metadata["externalId"] as? String ?? id,
             title: metadata["title"] as? String ?? "",
-            avatarURL: avatars?.last?["url"] as? String,
+            // The smallest that stays sharp in the sidebar; the largest is ~900 px.
+            avatarURL: (avatars?.first { ($0["width"] as? Int ?? 0) >= 88 } ?? avatars?.last)?["url"] as? String,
             videos: Self.unique(videos)
         )
     }
@@ -195,24 +201,26 @@ nonisolated final class InnerTubeClient: Sendable {
         return VideoDetails(video: video, description: details["shortDescription"] as? String ?? "")
     }
 
-    /// Whether YouTube refuses this video because it's for channel members.
-    /// Asked with the user's cookie, so a member gets `false`. Lists already
-    /// leave such videos out, but one saved while public can turn
-    /// members-only later.
+    /// What Bower needs when a video starts, from one `player` request:
+    /// whether YouTube refuses it because it's for channel members (asked
+    /// with the user's cookie, so a member gets `false`; lists already leave
+    /// such videos out, but one saved while public can turn members-only
+    /// later), and its description. A failed request reports neither.
     @concurrent
-    func isMembersOnly(videoID: String) async -> Bool {
-        guard let json = try? await post("player", body: ["videoId": videoID]),
-              let status = JSONNode.value(json, "playabilityStatus") as? [String: Any],
-              status["status"] as? String != "OK"
-        else { return false }
-        return JSONNode.string(status, "errorScreen", "playerLegacyDesktopYpcOfferRenderer", "offerId") == "sponsors_only_video"
+    func playerInfo(videoID: String) async -> PlayerInfo {
+        guard let json = try? await post("player", body: ["videoId": videoID]) else { return PlayerInfo() }
+        var info = PlayerInfo()
+        if let status = JSONNode.value(json, "playabilityStatus") as? [String: Any], status["status"] as? String != "OK" {
+            info.isMembersOnly = JSONNode.string(status, "errorScreen", "playerLegacyDesktopYpcOfferRenderer", "offerId") == "sponsors_only_video"
+        }
+        info.description = JSONNode.string(json, "videoDetails", "shortDescription") ?? ""
+        return info
     }
 
+    /// The description from the watch page, for when the player response
+    /// carries none.
     @concurrent
-    func description(videoID: String) async -> String {
-        if let details = try? await video(id: videoID), !details.description.isEmpty {
-            return details.description
-        }
+    func nextDescription(videoID: String) async -> String {
         guard let json = try? await post("next", body: ["videoId": videoID]) else { return "" }
         return JSONNode.text(JSONNode.first("attributedDescription", in: json)) ?? ""
     }

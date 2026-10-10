@@ -97,7 +97,7 @@ struct ContentView: View {
             Text(app.library.failures.prefix(6).map { "\($0.title): \($0.message)" }.joined(separator: "\n"))
         }
         .onChange(of: app.store.contentRevision) { app.libraryChanged() }
-        .onChange(of: app.store.userRevision) { app.libraryChanged() }
+        .onChange(of: app.store.userRevision) { app.userDataChanged() }
         .onChange(of: activeState) { _, state in
             if state == .key { app.library.refreshIfStale() }
         }

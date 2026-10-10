@@ -97,7 +97,9 @@ final class LibraryService {
         let client = InnerTubeClient.shared
         switch ref.type {
         case .playlist:
-            return .playlist(try await client.playlist(id: ref.id, fullHistory: full))
+            // Always read whole: playlists usually grow at the end and lose
+            // videos anywhere, which the first page alone can't show.
+            return .playlist(try await client.playlist(id: ref.id, fullHistory: true))
         case .channel:
             let snapshot = try await client.channel(id: ref.id, fullHistory: full)
             let avatar = await AvatarCache.ensure(channelID: snapshot.id, remoteURL: snapshot.avatarURL, existing: existingThumbnail)
@@ -119,15 +121,39 @@ final class LibraryService {
             if let avatar { source.thumbnail = avatar }
         }
 
-        if full {
-            if !fresh.isEmpty { source.items = fresh }
+        let stored = Dictionary(source.items.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let updated = fresh.map { Self.refreshed(stored[$0.id], with: $0) }
+        if full || ref.type == .playlist {
+            // A whole list was read, so YouTube's order and removals win.
+            if !updated.isEmpty { source.items = updated }
         } else {
-            let stored = Set(source.items.map(\.id))
-            let added = fresh.filter { !stored.contains($0.id) }
-            source.items = Array((added + source.items).prefix(InnerTubeClient.videoCap))
+            // Only a channel's newest page was read: new videos go on top and
+            // the rest stay, with whatever the page says about them now.
+            let byID = Dictionary(updated.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            let added = updated.filter { stored[$0.id] == nil }
+            let kept = source.items.map { byID[$0.id] ?? $0 }
+            source.items = Array((added + kept).prefix(InnerTubeClient.videoCap))
         }
         source.lastUpdated = nowMilliseconds()
         store.upsert(source, kind: ref.type)
+    }
+
+    /// A video as just fetched, keeping what the stored copy knows better.
+    /// Upload dates are estimates from "3 weeks ago" text that coarsen with
+    /// age, so the stored (earlier, finer) estimate is kept — unless it was
+    /// made before a premiere or stream happened, which the duration shows.
+    nonisolated static func refreshed(_ stored: Video?, with fresh: Video) -> Video {
+        guard let stored else { return fresh }
+        var video = fresh
+        let storedHasLength = stored.duration.contains(":")
+        if storedHasLength, let date = stored.publishedAt {
+            video.publishedAt = date
+        } else {
+            video.publishedAt = fresh.publishedAt ?? stored.publishedAt
+        }
+        // A page without a length badge says "Live"; a known length is better.
+        if storedHasLength, !fresh.duration.contains(":") { video.duration = stored.duration }
+        return video
     }
 
     // MARK: Adding

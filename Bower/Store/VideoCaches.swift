@@ -64,34 +64,45 @@ nonisolated struct DescriptionEntry: Codable, Sendable {
     var updatedAt: Double
 }
 
-/// Video descriptions, cached because fetching one costs a full player request.
+/// Video descriptions, cached so a replay shows one at once.
 final class DescriptionCache {
     private static let limit = 500
     private var entries: [String: DescriptionEntry]
-    private var inFlight: [String: Task<String, Never>] = [:]
+    private var saveTask: Task<Void, Never>?
 
     init() {
         entries = JSONFile.read([String: DescriptionEntry].self, from: AppPaths.descriptions) ?? [:]
     }
 
-    func description(for videoID: String) async -> String {
-        if let cached = entries[videoID] { return cached.text }
-        if let task = inFlight[videoID] { return await task.value }
+    func cached(_ videoID: String) -> String? {
+        entries[videoID]?.text
+    }
 
-        let task = Task { await InnerTubeClient.shared.description(videoID: videoID) }
-        inFlight[videoID] = task
-        let text = await task.value
-        inFlight[videoID] = nil
-
-        if !text.isEmpty {
-            entries[videoID] = DescriptionEntry(text: text, updatedAt: nowMilliseconds())
-            if entries.count > Self.limit {
-                let oldest = entries.sorted { $0.value.updatedAt < $1.value.updatedAt }.prefix(entries.count - Self.limit)
-                oldest.forEach { entries[$0.key] = nil }
-            }
-            let snapshot = entries
-            Task.detached(priority: .utility) { JSONFile.write(snapshot, to: AppPaths.descriptions) }
+    func store(_ text: String, for videoID: String) {
+        guard !text.isEmpty else { return }
+        entries[videoID] = DescriptionEntry(text: text, updatedAt: nowMilliseconds())
+        if entries.count > Self.limit {
+            let oldest = entries.sorted { $0.value.updatedAt < $1.value.updatedAt }.prefix(entries.count - Self.limit)
+            oldest.forEach { entries[$0.key] = nil }
         }
-        return text
+        // Debounced like the other stores, so writes land in order.
+        saveTask?.cancel()
+        let snapshot = entries
+        saveTask = Task {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            await Self.write(snapshot)
+        }
+    }
+
+    @concurrent
+    private static func write(_ snapshot: [String: DescriptionEntry]) async {
+        JSONFile.write(snapshot, to: AppPaths.descriptions)
+    }
+
+    func flush() {
+        guard saveTask != nil else { return }
+        saveTask?.cancel()
+        JSONFile.write(entries, to: AppPaths.descriptions)
     }
 }
