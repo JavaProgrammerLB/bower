@@ -430,48 +430,65 @@ final class LibraryStore {
 
     // MARK: Import / export
 
-    /// The library plus bookmarks, as a JSON file.
-    func exportData() throws -> Data {
-        let file = ExportFile(
-            playlists: playlists, channels: channels, folders: folders, sidebarOrder: sidebarOrder,
-            bookmarks: bookmarks.values.sorted { $0.createdAt > $1.createdAt }
-        )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(file)
+    /// The sources and folders as OPML, in sidebar order, without videos.
+    func exportOPML() -> Data {
+        OPML.encode(title: "Bower", order: sidebarOrder, folders: folders, source: source)
     }
 
-    /// Merges an export into the library; anything already present is kept
-    /// as is. Returns how many sources were added.
+    /// Merges a Bower JSON export or an OPML file into the library; anything
+    /// already present is kept as is, and an imported folder joins an
+    /// existing one of the same name. Returns the sources that were added.
     @discardableResult
-    func importData(_ data: Data) throws -> Int {
-        let file = try JSONDecoder().decode(ExportFile.self, from: data)
+    func importData(_ data: Data) throws -> [SourceRef] {
+        let file: ExportFile
+        if let json = try? JSONDecoder().decode(ExportFile.self, from: data) {
+            file = json
+        } else {
+            file = try OPML.decode(data)
+        }
         let playlistIDs = Set(playlists.map(\.id))
         let channelIDs = Set(channels.map(\.id))
         let newPlaylists = file.playlists.filter { !playlistIDs.contains($0.id) }
         let newChannels = file.channels.filter { !channelIDs.contains($0.id) }
         playlists += newPlaylists
         channels += newChannels
+        let added = newPlaylists.map { SourceRef(type: .playlist, id: $0.id) }
+            + newChannels.map { SourceRef(type: .channel, id: $0.id) }
+        let addedSet = Set(added)
 
-        let folderIDs = Set(folders.map(\.id))
-        folders += (file.folders ?? []).filter { !folderIDs.contains($0.id) }
+        // Imported folder id -> the folder it lands in here.
+        var folderTarget: [String: String] = [:]
+        for folder in file.folders ?? [] {
+            if let existing = folders.first(where: { $0.id == folder.id })
+                ?? folders.first(where: { $0.name.localizedCaseInsensitiveCompare(folder.name) == .orderedSame }) {
+                folderTarget[folder.id] = existing.id
+            } else {
+                folders.append(folder)
+                folderTarget[folder.id] = folder.id
+            }
+        }
 
         if let order = file.sidebarOrder {
-            var existing = Set<String>()
-            for entry in sidebarOrder {
+            var fresh: [SidebarEntry] = []
+            for entry in order {
                 switch entry {
-                case .source(let ref): existing.insert(ref.id)
+                case .source(let ref):
+                    if addedSet.contains(ref) { fresh.append(entry) }
                 case .folder(let id, let children):
-                    existing.insert(id)
-                    children.forEach { existing.insert($0.id) }
+                    let target = folderTarget[id] ?? id
+                    let newChildren = children.filter(addedSet.contains)
+                    if let index = sidebarOrder.firstIndex(where: {
+                        if case .folder(target, _) = $0 { true } else { false }
+                    }) {
+                        if case .folder(_, let existing) = sidebarOrder[index] {
+                            sidebarOrder[index] = .folder(id: target, children: existing + newChildren)
+                        }
+                    } else {
+                        fresh.append(.folder(id: target, children: newChildren))
+                    }
                 }
             }
-            insertAtTop(order.filter { entry in
-                switch entry {
-                case .source(let ref): !existing.contains(ref.id)
-                case .folder(let id, _): !existing.contains(id)
-                }
-            })
+            insertAtTop(fresh)
         }
         reconcileSidebarOrder()
         scheduleLibrarySave()
@@ -480,7 +497,7 @@ final class LibraryStore {
             bookmarks[bookmark.videoID] = bookmark
         }
         scheduleUserSave()
-        return newPlaylists.count + newChannels.count
+        return added
     }
 }
 

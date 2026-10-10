@@ -51,6 +51,10 @@ final class LibraryService {
         refresh([ref], full: full, markComplete: false)
     }
 
+    func refresh(_ refs: [SourceRef]) {
+        refresh(refs, full: false, markComplete: false)
+    }
+
     private func refresh(_ refs: [SourceRef], full: Bool, markComplete: Bool) {
         guard !isRefreshing, !refs.isEmpty else { return }
         isRefreshing = true

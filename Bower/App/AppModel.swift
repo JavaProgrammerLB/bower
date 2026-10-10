@@ -142,11 +142,11 @@ final class AppModel {
 
     func exportLibrary() {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "bower-export.json"
+        panel.allowedContentTypes = [OPML.contentType]
+        panel.nameFieldStringValue = "bower-export.opml"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            try store.exportData().write(to: url, options: .atomic)
+            try store.exportOPML().write(to: url, options: .atomic)
         } catch {
             alertMessage = "Couldn't export the library: \(error.localizedDescription)"
         }
@@ -154,14 +154,16 @@ final class AppModel {
 
     func importLibrary() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
+        panel.allowedContentTypes = [OPML.contentType, .xml, .json]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let added = try store.importData(Data(contentsOf: url))
-            alertMessage = added == 1 ? "Imported 1 playlist or channel." : "Imported \(added) playlists and channels."
+            // OPML carries no videos, so fetch them for what was just added.
+            library.refresh(added)
+            alertMessage = added.count == 1 ? "Imported 1 playlist or channel." : "Imported \(added.count) playlists and channels."
         } catch {
-            alertMessage = "That file isn't a Bower export."
+            alertMessage = "That file isn't an OPML file or a Bower export."
         }
     }
 
