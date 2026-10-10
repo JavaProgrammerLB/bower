@@ -162,10 +162,6 @@ struct SidebarView: View {
                 Label(folder.name, systemImage: folder.isCollapsed ? "folder" : "folder.fill")
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                Text("\(store.folderChildren(folder.id).count)")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
             }
             .contextMenu {
                 Button(folder.isCollapsed ? "Expand" : "Collapse") { store.setFolderCollapsed(folder.id, !folder.isCollapsed) }
