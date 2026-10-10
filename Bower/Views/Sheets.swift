@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // MARK: - Add
@@ -246,6 +247,8 @@ struct SearchSheet: View {
     @State private var index: [SearchResult] = []
     @State private var highlighted: String?
     @FocusState private var fieldFocused: Bool
+    @State private var sheetWindow: NSWindow?
+    @State private var clickMonitor: Any?
 
     private var results: [SearchResult] {
         let terms = query.lowercased().split(separator: " ")
@@ -304,11 +307,29 @@ struct SearchSheet: View {
             }
         }
         .frame(width: 600)
+        .background(WindowAccessor { sheetWindow = $0 })
         .onAppear {
             buildIndex()
             fieldFocused = true
+            installClickMonitor()
+        }
+        .onDisappear {
+            if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+            clickMonitor = nil
         }
         .onExitCommand { dismiss() }
+    }
+
+    /// The sheet blocks the window behind it, so clicks there never reach
+    /// SwiftUI; catch them here and treat them as a dismiss.
+    private func installClickMonitor() {
+        guard clickMonitor == nil else { return }
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { event in
+            guard let sheetWindow, event.window !== sheetWindow,
+                  event.window === sheetWindow.sheetParent else { return event }
+            dismiss()
+            return nil
+        }
     }
 
     private func resultRow(_ result: SearchResult) -> some View {
