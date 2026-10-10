@@ -42,7 +42,7 @@ struct BowerApp: App {
         Window("Bower", id: "main") {
             ContentView()
                 .environment(model)
-                .frame(minWidth: 760, minHeight: 460)
+                .frame(minHeight: 460)
                 .onAppear {
                     delegate.model = model
                     NSApp.appearance = theme.appearance
