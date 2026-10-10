@@ -173,12 +173,28 @@ struct SidebarView: View {
                 Divider()
                 Button("Delete Folder…", role: .destructive) { pendingDeletion = .folder(folder) }
             }
+            // `.onMove` only drops between rows, so a collapsed folder could
+            // never take a source. Dropping onto the header files it inside.
+            .onDrop(of: [.utf8PlainText], isTargeted: nil) { providers in
+                guard let provider = providers.first else { return false }
+                _ = provider.loadObject(ofClass: NSString.self) { object, _ in
+                    guard let text = object as? String, let ref = Self.sourceRef(fromDragText: text) else { return }
+                    Task { @MainActor in
+                        guard store.sidebarOrder.contains(where: {
+                            if case .folder(folder.id, let children) = $0 { !children.contains(ref) } else { false }
+                        }) else { return }
+                        withAnimation(.snappy(duration: 0.2)) { store.move(ref, toFolder: folder.id) }
+                    }
+                }
+                return true
+            }
 
         case .source(let ref, let parent):
             if let source = store.source(ref) {
                 SourceLabel(source: source, kind: ref.type, isRefreshing: app.library.refreshingRefs.contains(ref))
                     .padding(.leading, parent == nil ? 0 : 18)
                     .contextMenu { sourceMenu(ref: ref, title: source.title, parent: parent) }
+                    .itemProvider { NSItemProvider(object: Self.dragText(for: ref) as NSString) }
             }
         }
     }
@@ -222,6 +238,20 @@ struct SidebarView: View {
     }
 
     // MARK: Reordering
+
+    private nonisolated static let dragPrefix = "bower-source:"
+
+    private static func dragText(for ref: SourceRef) -> String {
+        "\(dragPrefix)\(ref.type.rawValue):\(ref.id)"
+    }
+
+    private nonisolated static func sourceRef(fromDragText text: String) -> SourceRef? {
+        guard text.hasPrefix(dragPrefix) else { return nil }
+        let body = text.dropFirst(dragPrefix.count)
+        guard let colon = body.firstIndex(of: ":"),
+              let kind = SourceKind(rawValue: String(body[..<colon])) else { return nil }
+        return SourceRef(type: kind, id: String(body[body.index(after: colon)...]))
+    }
 
     /// Applies a drag in the flattened sidebar to the nested order. A source
     /// lands in the folder of the row it is dropped under (an expanded folder
