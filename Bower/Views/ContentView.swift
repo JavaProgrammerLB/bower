@@ -36,12 +36,6 @@ struct ContentView: View {
                         .keyboardShortcut("[", modifiers: .command)
                     }
                 }
-                if !app.isPlayerVisible || !app.showVideoList {
-                    ToolbarItem(placement: .primaryAction) {
-                        toolbarControls
-                    }
-                    .sharedBackgroundVisibility(.hidden)
-                }
             }
         }
         // On the split view rather than the detail column, so the list is
@@ -53,18 +47,13 @@ struct ContentView: View {
                                         set: { if app.isPlayerVisible { app.showVideoList = $0 } })) {
             VideoListView()
                 .inspectorColumnWidth(min: 280, ideal: 340, max: 560)
+                .background(InspectorHeaderAnchor(isPresented: app.isPlayerVisible && app.showVideoList))
                 .toolbar {
-                    if app.isPlayerVisible && app.showVideoList {
-                        ToolbarItem(placement: .automatic) {
-                            VideoListHeader()
-                        }
-                        .sharedBackgroundVisibility(.hidden)
-                        ToolbarSpacer(.flexible)
-                        ToolbarItem(placement: .automatic) {
-                            toolbarControls
-                        }
-                        .sharedBackgroundVisibility(.hidden)
+                    ToolbarSpacer(.flexible)
+                    ToolbarItem(placement: .automatic) {
+                        toolbarControls
                     }
+                    .sharedBackgroundVisibility(.hidden)
                 }
         }
         .navigationTitle(app.displayedTitle)
@@ -100,7 +89,7 @@ struct ContentView: View {
         }.id(alwaysOnTop))
     }
 
-    // Keep the controls in the same toolbar section as the video list header.
+    // One persistent group stays at the trailing edge as the inspector toggles.
     private var toolbarControls: some View {
         HStack(spacing: 2) {
             if !app.isPlayerVisible, app.playback.current != nil {

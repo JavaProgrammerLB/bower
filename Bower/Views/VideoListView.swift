@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 
 /// The right-hand list of videos for whatever the sidebar has selected.
@@ -57,7 +58,7 @@ struct VideoListView: View {
     }
 }
 
-/// Toolbar content stays above the inspector's translucent background.
+/// The inspector title and playback position, above the toolbar material.
 struct VideoListHeader: View {
     @Environment(AppModel.self) private var app
 
@@ -82,6 +83,150 @@ struct VideoListHeader: View {
             return "\(count) \(noun)"
         }
         return "\(index + 1) of \(count) \(noun)"
+    }
+}
+
+/// Anchor the title to the inspector itself. Toolbar items have a separate
+/// insertion animation and can appear in the main column before it opens.
+struct InspectorHeaderAnchor: NSViewRepresentable {
+    @Environment(AppModel.self) private var app
+    let isPresented: Bool
+
+    private var header: AnyView {
+        AnyView(VideoListHeader()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .environment(app))
+    }
+
+    func makeNSView(context: Context) -> AnchorView {
+        AnchorView(header: header)
+    }
+
+    func updateNSView(_ view: AnchorView, context: Context) {
+        view.header.rootView = header
+        view.isPresented = isPresented
+        view.updateHeader()
+        view.trackTransition()
+    }
+
+    static func dismantleNSView(_ view: AnchorView, coordinator: ()) {
+        view.detach()
+    }
+
+    final class AnchorView: NSView {
+        let header: NSHostingView<AnyView>
+        private let overlay = HeaderOverlay()
+        var isPresented = false
+        private var displayLink: CADisplayLink?
+        private var trackingUntil: CFTimeInterval = 0
+        private var ancestors: [ObservedView] = []
+
+        init(header: AnyView) {
+            self.header = NSHostingView(rootView: header)
+            super.init(frame: .zero)
+            self.header.sizingOptions = []
+            self.header.safeAreaRegions = []
+            self.header.sceneBridgingOptions = []
+            overlay.clipsToBounds = true
+            overlay.addSubview(self.header)
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            detach()
+            guard let frameView = window?.contentView?.superview else { return }
+            frameView.addSubview(overlay, positioned: .above, relativeTo: nil)
+            var ancestor: NSView? = self
+            while let view = ancestor {
+                ancestors.append(ObservedView(view))
+                view.postsFrameChangedNotifications = true
+                ancestor = view.superview
+            }
+            NotificationCenter.default.addObserver(self, selector: #selector(frameChanged(_:)),
+                                                   name: NSView.frameDidChangeNotification, object: nil)
+            updateHeader()
+            trackTransition()
+        }
+
+        @objc private func frameChanged(_ notification: Notification) {
+            guard let view = notification.object as? NSView,
+                  ancestors.contains(where: { $0.view === view }) else { return }
+            updateHeader()
+            trackTransition()
+        }
+
+        func trackTransition() {
+            guard isPresented, displayLink == nil, let window else { return }
+            trackingUntil = CACurrentMediaTime() + 1
+            let link = window.displayLink(target: self, selector: #selector(tick(_:)))
+            displayLink = link
+            link.add(to: .main, forMode: .common)
+        }
+
+        @objc private func tick(_ link: CADisplayLink) {
+            updateHeader()
+            if !isPresented || CACurrentMediaTime() >= trackingUntil {
+                link.invalidate()
+                displayLink = nil
+            }
+        }
+
+        func updateHeader() {
+            guard isPresented, let window, let frameView = overlay.superview else {
+                overlay.isHidden = true
+                return
+            }
+            var sidebar = convert(bounds, to: nil)
+            var ancestor: NSView? = self
+            while let view = ancestor {
+                if let layer = view.layer, let presentation = layer.presentation() {
+                    sidebar.origin.x += presentation.frame.minX - layer.frame.minX
+                }
+                ancestor = view.superview
+            }
+            let windowBounds = frameView.convert(frameView.bounds, to: nil)
+            guard sidebar.width > 0, sidebar.maxX >= windowBounds.maxX - 1 else {
+                overlay.isHidden = true
+                return
+            }
+            let top = window.contentLayoutRect.maxY
+            let toolbar = NSRect(x: sidebar.minX, y: top, width: sidebar.width,
+                                 height: max(0, windowBounds.maxY - top))
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            let overlayFrame = frameView.convert(toolbar, from: nil)
+            let headerFrame = NSRect(x: 10, y: 0, width: max(0, sidebar.width - 110), height: toolbar.height)
+            if overlay.frame != overlayFrame { overlay.frame = overlayFrame }
+            if header.frame != headerFrame { header.frame = headerFrame }
+            overlay.isHidden = sidebar.width <= 0 || toolbar.height <= 0
+            CATransaction.commit()
+        }
+
+        func detach() {
+            displayLink?.invalidate()
+            displayLink = nil
+            NotificationCenter.default.removeObserver(self)
+            for ancestor in ancestors {
+                ancestor.view?.postsFrameChangedNotifications = ancestor.wasPosting
+            }
+            ancestors = []
+            overlay.removeFromSuperview()
+        }
+
+        private final class ObservedView {
+            weak var view: NSView?
+            let wasPosting: Bool
+            init(_ view: NSView) {
+                self.view = view
+                wasPosting = view.postsFrameChangedNotifications
+            }
+        }
+
+        private final class HeaderOverlay: NSView {
+            override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        }
     }
 }
 
