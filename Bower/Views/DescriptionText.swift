@@ -20,7 +20,9 @@ struct DescriptionText: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> NSTextView {
-        let textView = NSTextView()
+        // Match the coordinator's TextKit 1 measurer. The default TextKit 2
+        // view uses different line heights, which can clip the final lines.
+        let textView = NSTextView(usingTextLayoutManager: false)
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
