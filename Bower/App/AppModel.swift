@@ -35,7 +35,7 @@ final class AppModel {
     @ObservationIgnored private var haystacks: [String]?
 
     /// The main area shows either the selected list as a grid of videos or,
-    /// once a video is picked, the player with the list alongside it.
+    /// once a video is picked, the player with an optional video list.
     var isPlayerVisible = false
 
     private(set) var displayedVideos: [Video] = []
@@ -105,7 +105,7 @@ final class AppModel {
     func play(_ video: Video) {
         guard let selection else { return }
         playback.play(video, from: displayedVideos, context: selection)
-        isPlayerVisible = true
+        presentPlayer()
     }
 
     /// Plays the visible list from the top (or from a random video when
@@ -121,7 +121,7 @@ final class AppModel {
         if let context = playback.queueContext, context != selection {
             selection = context
         }
-        isPlayerVisible = true
+        presentPlayer()
     }
 
     /// Shows `selection` with one of its videos cued, as when picking a
@@ -130,8 +130,13 @@ final class AppModel {
         self.selection = selection
         if let video = displayedVideos.first(where: { $0.id == videoID }) {
             playback.play(video, from: displayedVideos, context: selection, autoplay: false)
-            isPlayerVisible = true
+            presentPlayer()
         }
+    }
+
+    private func presentPlayer() {
+        if !isPlayerVisible { showVideoList = false }
+        isPlayerVisible = true
     }
 
     func deleteSource(_ ref: SourceRef) {
