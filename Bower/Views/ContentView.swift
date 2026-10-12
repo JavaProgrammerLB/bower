@@ -36,32 +36,12 @@ struct ContentView: View {
                         .keyboardShortcut("[", modifiers: .command)
                     }
                 }
-                // One hand-drawn capsule so its contents can change between
-                // grid and player mode without reshuffling toolbar items.
-                ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 2) {
-                        if !app.isPlayerVisible, app.playback.current != nil {
-                            toolbarButton("Now Playing",
-                                          systemImage: app.playback.player.isPlaying ? "waveform" : "play.rectangle",
-                                          help: "Show Now Playing") {
-                                withAnimation(.snappy(duration: 0.25)) { app.showPlayer() }
-                            }
-                        }
-                        toolbarButton("Search", systemImage: "magnifyingglass", help: "Search Videos (⌘K)") {
-                            app.activeSheet = .search
-                        }
-                        if app.isPlayerVisible {
-                            toolbarButton("Video List", systemImage: "sidebar.trailing",
-                                          help: app.showVideoList ? "Hide Video List" : "Show Video List") {
-                                app.showVideoList.toggle()
-                            }
-                        }
+                if !app.isPlayerVisible || !app.showVideoList {
+                    ToolbarItem(placement: .primaryAction) {
+                        toolbarControls
                     }
-                    .padding(.horizontal, 4)
-                    .frame(height: 36)
-                    .glassEffect(.regular.interactive(), in: .capsule)
+                    .sharedBackgroundVisibility(.hidden)
                 }
-                .sharedBackgroundVisibility(.hidden)
             }
         }
         // On the split view rather than the detail column, so the list is
@@ -73,6 +53,19 @@ struct ContentView: View {
                                         set: { if app.isPlayerVisible { app.showVideoList = $0 } })) {
             VideoListView()
                 .inspectorColumnWidth(min: 280, ideal: 340, max: 560)
+                .toolbar {
+                    if app.isPlayerVisible && app.showVideoList {
+                        ToolbarItem(placement: .automatic) {
+                            VideoListHeader()
+                        }
+                        .sharedBackgroundVisibility(.hidden)
+                        ToolbarSpacer(.flexible)
+                        ToolbarItem(placement: .automatic) {
+                            toolbarControls
+                        }
+                        .sharedBackgroundVisibility(.hidden)
+                    }
+                }
         }
         .navigationTitle(app.displayedTitle)
         .sheet(item: $app.activeSheet) { sheet in
@@ -105,6 +98,31 @@ struct ContentView: View {
         .background(WindowAccessor { window in
             window.level = alwaysOnTop ? .floating : .normal
         }.id(alwaysOnTop))
+    }
+
+    // Keep the controls in the same toolbar section as the video list header.
+    private var toolbarControls: some View {
+        HStack(spacing: 2) {
+            if !app.isPlayerVisible, app.playback.current != nil {
+                toolbarButton("Now Playing",
+                              systemImage: app.playback.player.isPlaying ? "waveform" : "play.rectangle",
+                              help: "Show Now Playing") {
+                    withAnimation(.snappy(duration: 0.25)) { app.showPlayer() }
+                }
+            }
+            toolbarButton("Search", systemImage: "magnifyingglass", help: "Search Videos (⌘K)") {
+                app.activeSheet = .search
+            }
+            if app.isPlayerVisible {
+                toolbarButton("Video List", systemImage: "sidebar.trailing",
+                              help: app.showVideoList ? "Hide Video List" : "Show Video List") {
+                    app.showVideoList.toggle()
+                }
+            }
+        }
+        .padding(.horizontal, 4)
+        .frame(height: 36)
+        .glassEffect(.regular.interactive(), in: .capsule)
     }
 
     private func toolbarButton(_ title: String, systemImage: String, help: String,
