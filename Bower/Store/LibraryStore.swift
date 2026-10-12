@@ -19,6 +19,8 @@ nonisolated struct UserFile: Codable, Sendable {
 /// lighter per-video state (bookmarks, history, hidden videos).
 @Observable
 final class LibraryStore {
+    private static let videoListLimit = 100
+
     private(set) var playlists: [Source] = []
     private(set) var channels: [Source] = []
     private(set) var folders: [Folder] = []
@@ -53,7 +55,7 @@ final class LibraryStore {
         }
         if let user = JSONFile.read(UserFile.self, from: AppPaths.userData) {
             bookmarks = Dictionary(user.bookmarks.map { ($0.videoID, $0) }, uniquingKeysWith: { a, _ in a })
-            watchHistory = user.watchHistory
+            watchHistory = Array(user.watchHistory.prefix(Self.videoListLimit))
             skipped = Set(user.skippedVideos)
             lastRefresh = user.lastRefresh.map { Date(timeIntervalSince1970: $0 / 1000) }
         }
@@ -337,7 +339,9 @@ final class LibraryStore {
         watchHistory.removeAll { $0.videoId == video.id }
         watchHistory.insert(HistoryEntry(videoId: video.id, title: video.title, thumbnail: video.thumbnail,
                                          duration: video.duration, watchedAt: nowMilliseconds()), at: 0)
-        if watchHistory.count > 500 { watchHistory.removeLast(watchHistory.count - 500) }
+        if watchHistory.count > Self.videoListLimit {
+            watchHistory.removeLast(watchHistory.count - Self.videoListLimit)
+        }
         scheduleUserSave()
     }
 
@@ -351,7 +355,7 @@ final class LibraryStore {
     func videos(for selection: LibrarySelection) -> [Video] {
         switch selection {
         case .latest:
-            return newest(channels + playlists, limit: 100)
+            return newest(channels + playlists, limit: Self.videoListLimit)
         case .folder(let id):
             let refs = folderChildren(id)
             return merged(refs.compactMap { source($0) })
