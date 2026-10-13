@@ -86,11 +86,10 @@ struct VideoListHeader: View {
     }
 }
 
-/// Anchor the title to the inspector itself. Toolbar items have a separate
-/// insertion animation and can appear in the main column before it opens.
+/// Place the title above the inspector material, inside its native split pane,
+/// so it inherits the pane's opening and closing animation.
 struct InspectorHeaderAnchor: NSViewRepresentable {
     @Environment(AppModel.self) private var app
-    let isPresented: Bool
 
     private var header: AnyView {
         AnyView(VideoListHeader()
@@ -104,9 +103,7 @@ struct InspectorHeaderAnchor: NSViewRepresentable {
 
     func updateNSView(_ view: AnchorView, context: Context) {
         view.header.rootView = header
-        view.isPresented = isPresented
         view.updateHeader()
-        view.trackTransition()
     }
 
     static func dismantleNSView(_ view: AnchorView, coordinator: ()) {
@@ -116,9 +113,6 @@ struct InspectorHeaderAnchor: NSViewRepresentable {
     final class AnchorView: NSView {
         let header: NSHostingView<AnyView>
         private let overlay = HeaderOverlay()
-        var isPresented = false
-        private var displayLink: CADisplayLink?
-        private var trackingUntil: CFTimeInterval = 0
         private var ancestors: [ObservedView] = []
 
         init(header: AnyView) {
@@ -136,8 +130,12 @@ struct InspectorHeaderAnchor: NSViewRepresentable {
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             detach()
-            guard let frameView = window?.contentView?.superview else { return }
-            frameView.addSubview(overlay, positioned: .above, relativeTo: nil)
+            var column: NSView? = self
+            while let view = column, !(view.superview is NSSplitView) {
+                column = view.superview
+            }
+            guard let column, column.superview is NSSplitView else { return }
+            column.addSubview(overlay, positioned: .above, relativeTo: nil)
             var ancestor: NSView? = self
             while let view = ancestor {
                 ancestors.append(ObservedView(view))
@@ -147,45 +145,21 @@ struct InspectorHeaderAnchor: NSViewRepresentable {
             NotificationCenter.default.addObserver(self, selector: #selector(frameChanged(_:)),
                                                    name: NSView.frameDidChangeNotification, object: nil)
             updateHeader()
-            trackTransition()
         }
 
         @objc private func frameChanged(_ notification: Notification) {
             guard let view = notification.object as? NSView,
                   ancestors.contains(where: { $0.view === view }) else { return }
             updateHeader()
-            trackTransition()
-        }
-
-        func trackTransition() {
-            guard isPresented, displayLink == nil, let window else { return }
-            trackingUntil = CACurrentMediaTime() + 1
-            let link = window.displayLink(target: self, selector: #selector(tick(_:)))
-            displayLink = link
-            link.add(to: .main, forMode: .common)
-        }
-
-        @objc private func tick(_ link: CADisplayLink) {
-            updateHeader()
-            if !isPresented || CACurrentMediaTime() >= trackingUntil {
-                link.invalidate()
-                displayLink = nil
-            }
         }
 
         func updateHeader() {
-            guard isPresented, let window, let frameView = overlay.superview else {
+            guard let window, let column = overlay.superview,
+                  let frameView = window.contentView?.superview else {
                 overlay.isHidden = true
                 return
             }
-            var sidebar = convert(bounds, to: nil)
-            var ancestor: NSView? = self
-            while let view = ancestor {
-                if let layer = view.layer, let presentation = layer.presentation() {
-                    sidebar.origin.x += presentation.frame.minX - layer.frame.minX
-                }
-                ancestor = view.superview
-            }
+            let sidebar = column.convert(column.bounds, to: nil)
             let windowBounds = frameView.convert(frameView.bounds, to: nil)
             guard sidebar.width > 0, sidebar.maxX >= windowBounds.maxX - 1 else {
                 overlay.isHidden = true
@@ -196,7 +170,7 @@ struct InspectorHeaderAnchor: NSViewRepresentable {
                                  height: max(0, windowBounds.maxY - top))
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            let overlayFrame = frameView.convert(toolbar, from: nil)
+            let overlayFrame = column.convert(toolbar, from: nil)
             let headerFrame = NSRect(x: 10, y: 0, width: max(0, sidebar.width - 110), height: toolbar.height)
             if overlay.frame != overlayFrame { overlay.frame = overlayFrame }
             if header.frame != headerFrame { header.frame = headerFrame }
@@ -205,8 +179,6 @@ struct InspectorHeaderAnchor: NSViewRepresentable {
         }
 
         func detach() {
-            displayLink?.invalidate()
-            displayLink = nil
             NotificationCenter.default.removeObserver(self)
             for ancestor in ancestors {
                 ancestor.view?.postsFrameChangedNotifications = ancestor.wasPosting

@@ -47,7 +47,7 @@ struct ContentView: View {
                                         set: { if app.isPlayerVisible { app.showVideoList = $0 } })) {
             VideoListView()
                 .inspectorColumnWidth(min: 280, ideal: 340, max: 560)
-                .background(InspectorHeaderAnchor(isPresented: app.isPlayerVisible && app.showVideoList))
+                .background(InspectorHeaderAnchor())
                 .toolbar {
                     ToolbarSpacer(.flexible)
                     ToolbarItem(placement: .automatic) {
