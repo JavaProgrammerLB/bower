@@ -1,14 +1,16 @@
 import Foundation
 import Observation
+#if canImport(Sparkle)
 import Sparkle
+#endif
 
-/// Sparkle's standard updater. It reads the feed and public key from
-/// Info.plist, checks in the background (Release builds only, see
-/// SUEnableAutomaticChecks), and shows its own windows for the rest.
+/// Sparkle's standard updater when the Sparkle module is linked. Builds made
+/// without Sparkle keep the menu item and leave checking disabled.
 @Observable
 final class Updater {
     private(set) var canCheckForUpdates = false
 
+#if canImport(Sparkle)
     @ObservationIgnored private let controller = SPUStandardUpdaterController(
         startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
     )
@@ -24,4 +26,7 @@ final class Updater {
     func checkForUpdates() {
         controller.checkForUpdates(nil)
     }
+#else
+    func checkForUpdates() {}
+#endif
 }
