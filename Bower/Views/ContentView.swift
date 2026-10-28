@@ -49,11 +49,17 @@ struct ContentView: View {
                 .inspectorColumnWidth(min: 280, ideal: 340, max: 560)
                 .background(InspectorHeaderAnchor())
                 .toolbar {
-                    ToolbarSpacer(.flexible)
-                    ToolbarItem(placement: .automatic) {
-                        toolbarControls
+                    if #available(macOS 26.0, *) {
+                        ToolbarSpacer(.flexible)
+                        ToolbarItem(placement: .automatic) {
+                            toolbarControls
+                        }
+                        .sharedBackgroundVisibility(.hidden)
+                    } else {
+                        ToolbarItem(placement: .primaryAction) {
+                            toolbarControls
+                        }
                     }
-                    .sharedBackgroundVisibility(.hidden)
                 }
         }
         .navigationTitle(app.displayedTitle)
