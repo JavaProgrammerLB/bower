@@ -71,7 +71,7 @@ struct SidebarView: View {
             Button("New Folder") { startNewFolder() }
             Button("Add Playlist, Channel, or Video…") { app.activeSheet = .add }
         }
-        .safeAreaBar(edge: .bottom, spacing: 0) {
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             RefreshStatusBar()
         }
         .toolbar {

@@ -130,7 +130,7 @@ cat > $dist/appcast.xml <<EOF
       <pubDate>$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')</pubDate>
       <sparkle:version>$build_number</sparkle:version>
       <sparkle:shortVersionString>$version</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:minimumSystemVersion>15.7</sparkle:minimumSystemVersion>
       <description><![CDATA[<ul>
 $notes_html
 </ul>]]></description>

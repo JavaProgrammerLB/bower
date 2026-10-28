@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		06C996FFA109450F517D98A6 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = D8D831B94337D0F8231F7DAD /* Sparkle */; };
+		A1C0FFEE0000000000000001 /* Compatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000002 /* Compatibility.swift */; };
 		07BF27E0B3898A5FE02765C9 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54090C49B65F709DEC541A31 /* NowPlayingView.swift */; };
 		15F8BF1230F514D2C2008EDE /* TimeFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773ED08805B3C3A95EFEA796 /* TimeFormatting.swift */; };
 		21502D898944DCE0EFCE75D9 /* DescriptionText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28414A47676B3B7C9D9C2AA2 /* DescriptionText.swift */; };
@@ -64,6 +65,7 @@
 		D741AEE0EC3C24B6F5120DFA /* app.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = app.icon; sourceTree = "<group>"; };
 		DA1EE008D47D24C51E481823 /* BowerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BowerApp.swift; sourceTree = "<group>"; };
 		E0154239E5C99223DDA25CD6 /* VideoListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoListView.swift; sourceTree = "<group>"; };
+		A1C0FFEE0000000000000002 /* Compatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Compatibility.swift; sourceTree = "<group>"; };
 		E518D16222F43C2225A12A9E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F03C55D8D29A6B046436FBBD /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		F52D4604A294EE5D03172153 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
@@ -113,6 +115,7 @@
 		8956E4BE77309C07BE29583B /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				A1C0FFEE0000000000000002 /* Compatibility.swift */,
 				F03C55D8D29A6B046436FBBD /* ContentView.swift */,
 				28414A47676B3B7C9D9C2AA2 /* DescriptionText.swift */,
 				54090C49B65F709DEC541A31 /* NowPlayingView.swift */,
@@ -272,6 +275,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1C0FFEE0000000000000001 /* Compatibility.swift in Sources */,
 				3CA1B44C5A69C775EAC4E7E9 /* AppCommands.swift in Sources */,
 				5FD0E7176999C1D26998F2D6 /* AppModel.swift in Sources */,
 				BDE27EED2F3BDEFA48274C31 /* AppPaths.swift in Sources */,
@@ -381,7 +385,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
 				MARKETING_VERSION = 2.1.4;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -468,7 +472,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
 				MARKETING_VERSION = 2.1.4;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;

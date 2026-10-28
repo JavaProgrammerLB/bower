@@ -2,7 +2,7 @@ name: Bower
 options:
   bundleIdPrefix: me.limboy
   deploymentTarget:
-    macOS: "26.0"
+    macOS: "15.7"
   createIntermediateGroups: true
 packages:
   Sparkle:
@@ -14,7 +14,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
     SWIFT_APPROACHABLE_CONCURRENCY: YES
-    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.7"
     MARKETING_VERSION: "2.1.4"
     CURRENT_PROJECT_VERSION: "1"
 

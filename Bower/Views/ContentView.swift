@@ -111,7 +111,7 @@ struct ContentView: View {
         }
         .padding(.horizontal, 4)
         .frame(height: 36)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .modifier(CapsuleGlass())
     }
 
     private func toolbarButton(_ title: String, systemImage: String, help: String,
