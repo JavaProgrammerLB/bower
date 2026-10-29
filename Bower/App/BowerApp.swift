@@ -43,12 +43,10 @@ struct BowerApp: App {
         Window("Bower", id: "main") {
             ContentView()
                 .environment(model)
-                // A fixed minimum rather than one derived from the content: a
-                // content-driven minimum loops AppKit's constraint passes (it
-                // throws "more Update Constraints in Window passes than there
-                // are views"). Wide enough for sidebar + player + video list,
-                // which otherwise overflow and get cropped on both sides.
-                .frame(minWidth: model.isPlayerVisible && model.showVideoList ? 960 : 760, minHeight: 460)
+                // The minimum has to stay constant. Switching it when the player
+                // opens asks AppKit for another constraint pass while one is
+                // already running, and the process is killed.
+                .frame(minWidth: 960, minHeight: 460)
                 .onAppear {
                     delegate.model = model
                     NSApp.appearance = theme.appearance

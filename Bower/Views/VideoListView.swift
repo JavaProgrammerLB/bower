@@ -113,10 +113,16 @@ struct InspectorHeaderAnchor: NSViewRepresentable {
         let header: NSHostingView<AnyView>
         private let overlay = HeaderOverlay()
         private var ancestors: [ObservedView] = []
+        private var applyScheduled = false
 
         init(header: AnyView) {
             self.header = NSHostingView(rootView: header)
             super.init(frame: .zero)
+            // Frame changes must not re-enter the window's constraint pass.
+            // NSHostingView otherwise turns a frame write into another
+            // setNeedsUpdateConstraints while AppKit is already updating.
+            self.header.translatesAutoresizingMaskIntoConstraints = true
+            overlay.translatesAutoresizingMaskIntoConstraints = true
             self.header.sizingOptions = []
             self.header.safeAreaRegions = []
             self.header.sceneBridgingOptions = []
@@ -153,6 +159,19 @@ struct InspectorHeaderAnchor: NSViewRepresentable {
         }
 
         func updateHeader() {
+            guard !applyScheduled else { return }
+            applyScheduled = true
+            // frameDidChange arrives inside the window's constraint pass.
+            // Moving the hosting view then asks for another pass, and AppKit
+            // terminates the process.
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.applyScheduled = false
+                self.applyHeaderFrame()
+            }
+        }
+
+        private func applyHeaderFrame() {
             guard let window, let column = overlay.superview,
                   let frameView = window.contentView?.superview else {
                 overlay.isHidden = true
