@@ -60,14 +60,20 @@ extension CookieStore {
             }
         }
         let expiry = Date().addingTimeInterval(60 * 60 * 24 * 365)
+        // A leading-dot domain is stored and then ignored by the watch page, so
+        // the player never sees SAPISID and treats the visit as anonymous.
+        // Host-only cookies for www.youtube.com show up in the document.
+        let origin = URL(string: "https://www.youtube.com")!
         for (name, value) in Self.pairs(cookie) {
             let properties: [HTTPCookiePropertyKey: Any] = [
-                .domain: ".youtube.com",
+                .domain: "www.youtube.com",
                 .path: "/",
                 .name: name,
                 .value: value,
                 .secure: "TRUE",
                 .expires: expiry,
+                .sameSitePolicy: HTTPCookieStringPolicy.sameSiteLax,
+                .originURL: origin,
             ]
             if let cookie = HTTPCookie(properties: properties) {
                 await jar.setCookie(cookie)

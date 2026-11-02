@@ -113,7 +113,7 @@ final class YouTubePlayer: NSObject {
         let generation = playGeneration
         let start = currentTime
         Task { @MainActor in
-            await CookieStore.shared.syncToWebKit(clearExisting: false)
+            await CookieStore.shared.syncToWebKit(clearExisting: true)
             guard generation == self.playGeneration, self.currentVideoID == id else { return }
             // Embedding from this app is rejected (153 without a Referer, 152-4
             // when the document origin is youtube.com). The watch page is a
