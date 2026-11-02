@@ -240,6 +240,11 @@ nonisolated final class InnerTubeClient: Sendable {
     /// such videos out, but one saved while public can turn members-only
     /// later), and its description. A failed request reports neither.
     @concurrent
+    func playerDocument(videoID: String) async -> Any? {
+        try? await post("player", body: ["videoId": videoID])
+    }
+
+    @concurrent
     func playerInfo(videoID: String) async -> PlayerInfo {
         guard let json = try? await post("player", body: ["videoId": videoID]) else { return PlayerInfo() }
         var info = PlayerInfo()

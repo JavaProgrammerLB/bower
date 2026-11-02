@@ -15,6 +15,12 @@ struct NowPlayingView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .shadow(color: .black.opacity(0.18), radius: 14, y: 6)
 
+                        if let message = playback.player.errorMessage {
+                            Label(message, systemImage: "person.crop.circle.badge.exclamationmark")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+
                         VideoHeader(video: video)
 
                         Divider()

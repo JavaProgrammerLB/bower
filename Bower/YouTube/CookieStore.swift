@@ -64,6 +64,8 @@ extension CookieStore {
         // the player never sees SAPISID and treats the visit as anonymous.
         // Host-only cookies for www.youtube.com show up in the document.
         let origin = URL(string: "https://www.youtube.com")!
+        var created = 0
+        var skipped = 0
         for (name, value) in Self.pairs(cookie) {
             let properties: [HTTPCookiePropertyKey: Any] = [
                 .domain: "www.youtube.com",
@@ -77,10 +79,45 @@ extension CookieStore {
             ]
             if let cookie = HTTPCookie(properties: properties) {
                 await jar.setCookie(cookie)
+                created += 1
+            } else {
+                skipped += 1
             }
         }
+        // #region agent log
+        let names = Set((await jar.allCookies()).map(\.name))
+        agentLog("H1", "CookieStore.syncToWebKit", "jar after sync", [
+            "clearExisting": clearExisting,
+            "created": created,
+            "skipped": skipped,
+            "jarCount": names.count,
+            "hasSAPISID": names.contains("SAPISID"),
+            "hasSID": names.contains("SID"),
+            "hasLOGIN": names.contains("LOGIN_INFO"),
+        ])
+        // #endregion
     }
 }
+
+// #region agent log
+private func agentLog(_ hypothesisId: String, _ location: String, _ message: String, _ data: [String: Any]) {
+    let payload: [String: Any] = [
+        "sessionId": "b1f5ea", "runId": "post-fix", "hypothesisId": hypothesisId,
+        "location": location, "message": message, "data": data,
+        "timestamp": Int(Date().timeIntervalSince1970 * 1000),
+    ]
+    guard let raw = try? JSONSerialization.data(withJSONObject: payload) else { return }
+    let url = URL(fileURLWithPath: "/Users/bill/Program/bower/.cursor/debug-b1f5ea.log")
+    let line = raw + Data("\n".utf8)
+    if FileManager.default.fileExists(atPath: url.path), let handle = try? FileHandle(forWritingTo: url) {
+        handle.seekToEndOfFile()
+        try? handle.write(contentsOf: line)
+        try? handle.close()
+    } else {
+        try? line.write(to: url)
+    }
+}
+// #endregion
 
 /// Accepts either form a user can get without tooling: the `cookie:` request
 /// header copied from devtools, or a Netscape `cookies.txt` export.
