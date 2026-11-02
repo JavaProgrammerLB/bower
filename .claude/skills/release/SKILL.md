@@ -47,7 +47,7 @@ scripts/release.sh <version> <notes.md>
 
 This sets `MARKETING_VERSION`, regenerates the Xcode project, commits `Release v<version>` (unless that's already the version), makes an annotated tag with the notes as its message (the workflow reads them from there), and pushes `main` and the tag.
 
-`LOCAL=1` builds and publishes from this Mac instead. Use it only if the user asks or the workflow can't run. For signing and notarizing locally, the credentials are in `~/Library/CloudStorage/Dropbox/Secure/apple_no_certifications_password/` (`DEVELOPER_ID="Developer ID Application: LI ZHONG (5P9ZHW7578)"`, `APPLE_API_KEY_PATH`, `APPLE_API_KEY_ID=C9X9XHN78Y`, `APPLE_API_ISSUER` from `ASC_ISSUER_ID.txt`). Never print or `cat` those files.
+`LOCAL=1` builds and publishes from this Mac instead. Use it only if the user asks or the workflow can't run. Signing and notarizing locally uses the Developer ID and App Store Connect API key kept outside this repo. Never print or `cat` those files.
 
 ## 5. Watch the workflow
 
