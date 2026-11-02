@@ -49,11 +49,7 @@ struct ContentView: View {
                 .inspectorColumnWidth(min: 280, ideal: 340, max: 560)
                 .background(InspectorHeaderAnchor())
                 .toolbar {
-                    ToolbarSpacer(.flexible)
-                    ToolbarItem(placement: .automatic) {
-                        toolbarControls
-                    }
-                    .sharedBackgroundVisibility(.hidden)
+                    GlassToolbarGroup { toolbarControls }
                 }
         }
         .navigationTitle(app.displayedTitle)
@@ -111,7 +107,6 @@ struct ContentView: View {
         }
         .padding(.horizontal, 4)
         .frame(height: 36)
-        .glassEffect(.regular.interactive(), in: .capsule)
     }
 
     private func toolbarButton(_ title: String, systemImage: String, help: String,

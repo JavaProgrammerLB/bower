@@ -187,18 +187,51 @@ nonisolated final class InnerTubeClient: Sendable {
     @concurrent
     func video(id: String) async throws -> VideoDetails {
         let json = try await post("player", body: ["videoId": id])
-        guard let details = JSONNode.value(json, "videoDetails") as? [String: Any],
-              let title = details["title"] as? String, !title.isEmpty
-        else {
-            let status = JSONNode.value(json, "playabilityStatus") as? [String: Any]
-            let reason = (status?["reason"] as? String) ?? (status?["status"] as? String)
-            throw YouTubeError("Couldn't load video details\(reason.map { " (\($0))" } ?? ""). Please try again.")
+        if let details = JSONNode.value(json, "videoDetails") as? [String: Any],
+           let title = details["title"] as? String, !title.isEmpty {
+            let isLive = details["isLive"] as? Bool ?? false
+            let seconds = Int(details["lengthSeconds"] as? String ?? "") ?? 0
+            let duration = isLive || seconds == 0 ? "Live" : DurationText.format(seconds: seconds)
+            let video = Video(id: id, title: title, thumbnail: InnerTubeParser.thumbnail(for: id), duration: duration)
+            return VideoDetails(video: video, description: details["shortDescription"] as? String ?? "")
         }
-        let isLive = details["isLive"] as? Bool ?? false
-        let seconds = Int(details["lengthSeconds"] as? String ?? "") ?? 0
-        let duration = isLive || seconds == 0 ? "Live" : DurationText.format(seconds: seconds)
-        let video = Video(id: id, title: title, thumbnail: InnerTubeParser.thumbnail(for: id), duration: duration)
-        return VideoDetails(video: video, description: details["shortDescription"] as? String ?? "")
+        // An unsigned WEB player call can return LOGIN_REQUIRED with no
+        // videoDetails. oEmbed still has the public title, and the embed plays.
+        if let listed = try? await oEmbed(videoID: id) {
+            let video = Video(id: id, title: listed.title,
+                              thumbnail: listed.thumbnailURL ?? InnerTubeParser.thumbnail(for: id),
+                              duration: "", sourceTitle: listed.author)
+            return VideoDetails(video: video, description: "")
+        }
+        let status = JSONNode.value(json, "playabilityStatus") as? [String: Any]
+        let reason = (status?["reason"] as? String) ?? (status?["status"] as? String)
+        throw YouTubeError("Couldn't load video details\(reason.map { " (\($0))" } ?? ""). Please try again.")
+    }
+
+    private struct OEmbedListing: Decodable {
+        var title: String
+        var author: String?
+        var thumbnailURL: String?
+
+        enum CodingKeys: String, CodingKey {
+            case title
+            case author = "author_name"
+            case thumbnailURL = "thumbnail_url"
+        }
+    }
+
+    @concurrent
+    private func oEmbed(videoID: String) async throws -> OEmbedListing {
+        let url = URL(string: "https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=\(videoID)")!
+        var request = URLRequest(url: url)
+        request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw YouTubeError("oEmbed failed")
+        }
+        let listed = try JSONDecoder().decode(OEmbedListing.self, from: data)
+        guard !listed.title.isEmpty else { throw YouTubeError("oEmbed failed") }
+        return listed
     }
 
     /// What Bower needs when a video starts, from one `player` request:

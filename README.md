@@ -13,7 +13,7 @@ it and drag Bower to Applications). Bower updates itself through
 
 ## System Requirements
 
-- macOS 26 Tahoe or later
+- macOS 15 Sequoia or later
 - A Mac with Apple silicon
 
 ## Build

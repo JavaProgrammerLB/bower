@@ -26,6 +26,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+bash scripts/check-availability.sh
 version=${1:?usage: scripts/build-release.sh <version> [notes.md]}
 notes_file=${2:-}
 repo=limboy/bower
@@ -120,6 +121,11 @@ else
 fi
 
 notes_html=$(sed -E 's/^[-*] +(.*)$/<li>\1<\/li>/' $dist/notes.md | grep '^<li>' || true)
+min_os=$(plutil -extract LSMinimumSystemVersion raw -o - "$app/Contents/Info.plist" 2>/dev/null || true)
+if [[ -z $min_os ]]; then
+  echo "LSMinimumSystemVersion is missing from $app/Contents/Info.plist" >&2
+  exit 1
+fi
 cat > $dist/appcast.xml <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
@@ -130,7 +136,7 @@ cat > $dist/appcast.xml <<EOF
       <pubDate>$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')</pubDate>
       <sparkle:version>$build_number</sparkle:version>
       <sparkle:shortVersionString>$version</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:minimumSystemVersion>$min_os</sparkle:minimumSystemVersion>
       <description><![CDATA[<ul>
 $notes_html
 </ul>]]></description>

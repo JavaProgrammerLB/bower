@@ -5,7 +5,6 @@ import SwiftUI
 /// The right-hand list of videos for whatever the sidebar has selected.
 struct VideoListView: View {
     @Environment(AppModel.self) private var app
-    @State private var isScrolled = false
 
     var body: some View {
         let videos = app.filteredVideos
@@ -26,12 +25,7 @@ struct VideoListView: View {
             .listStyle(.plain)
             .contentMargins(.top, 10, for: .scrollContent)
             .scrollContentBackground(.hidden)
-            .scrollEdgeEffectStyle(isScrolled ? .hard : .automatic, for: .top)
-            .onScrollGeometryChange(for: Bool.self) { geometry in
-                geometry.contentOffset.y + geometry.contentInsets.top > 0.5
-            } action: { _, isScrolled in
-                self.isScrolled = isScrolled
-            }
+            .glassScrollEdge()
             .overlay {
                 if videos.isEmpty && !app.filter.isEmpty {
                     ContentUnavailableView.search(text: app.filter)
@@ -44,7 +38,7 @@ struct VideoListView: View {
             .onAppear {
                 if let currentID { proxy.scrollTo(currentID, anchor: .center) }
             }
-            .safeAreaBar(edge: .bottom) { FilterBar() }
+            .glassBar { FilterBar() }
         }
         .onDisappear { app.filter = "" }
     }
@@ -349,7 +343,7 @@ private struct FilterBar: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 32)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .glassCapsule()
         .padding(.horizontal, 12)
         .padding(.bottom, 12)
         .padding(.top, 6)
