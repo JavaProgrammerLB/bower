@@ -3,10 +3,13 @@ import Observation
 import WebKit
 
 /// Drives playback inside one long-lived WKWebView. Cueing still uses the
-/// iframe API. Playing loads a YouTube document so the saved account cookie
-/// is first-party and the embed request carries a Referer — a bare embed
-/// navigation is rejected with error 153, and the localhost setup page makes
-/// the player a third-party document that drops the cookie.
+/// iframe API. Playing loads YouTube's watch page in this same web view.
+///
+/// The pasted account cookie is only for InnerTube library calls. Copying it
+/// into the web view makes the account API look signed in, but the watch page
+/// still answers LOGIN_REQUIRED, and a later Google sign-in ends at
+/// CookieMismatch. Playback has to be a session this web view established
+/// itself, the way an in-app browser does.
 @Observable
 final class YouTubePlayer: NSObject {
     enum State: Int {
@@ -17,6 +20,9 @@ final class YouTubePlayer: NSObject {
     private(set) var currentTime: Double = 0
     private(set) var duration: Double = 0
     private(set) var errorMessage: String?
+    /// The watch page is showing YouTube's sign-in wall. The page stays
+    /// interactive so the user can sign in here; the library cookie cannot.
+    private(set) var needsSignIn = false
     private(set) var isReady = false
 
     @ObservationIgnored let webView: WKWebView
@@ -99,6 +105,7 @@ final class YouTubePlayer: NSObject {
         errorMessage = nil
         let start = (start ?? 0).rounded(.down)
         currentTime = start
+        needsSignIn = false
         if autoplay {
             play()
             return
@@ -118,7 +125,7 @@ final class YouTubePlayer: NSObject {
             send(.play)
             return
         }
-        if pageVideoID == id, pageKind == .embed || pageKind == .watch {
+        if pageVideoID == id, isShowing(videoID: id) {
             // #region agent log
             agentLog("H4", "YouTubePlayer.play", "already on page", ["pageKind": "\(pageKind)", "video": id])
             // #endregion
@@ -132,17 +139,43 @@ final class YouTubePlayer: NSObject {
         agentLog("H4", "YouTubePlayer.play", "navigate", ["generation": generation, "video": id, "pageKind": "\(pageKind)"])
         // #endregion
         Task { @MainActor in
-            await CookieStore.shared.syncToWebKit(clearExisting: true)
+            // Drop cookies previously copied in from the pasted header. Once
+            // the web view has signed in on its own, leave that session alone.
+            await CookieStore.shared.preparePlaybackSession()
             let stillCurrent = generation == self.playGeneration && self.currentVideoID == id
             // #region agent log
-            agentLog("H4", "YouTubePlayer.play", "after sync", ["generation": generation, "stillCurrent": stillCurrent, "video": id])
+            agentLog("H4", "YouTubePlayer.play", "after session prepare", ["generation": generation, "stillCurrent": stillCurrent, "video": id])
             // #endregion
             guard stillCurrent else { return }
             // Embedding from this app is rejected (153 without a Referer, 152-4
-            // when the document origin is youtube.com). The watch page is a
-            // first-party youtube.com navigation, so it sends the account cookie.
+            // when the document origin is youtube.com). A top-level watch page
+            // plays once this web view has its own sign-in.
             self.loadWatchPage(videoID: id, start: start)
             await self.probeNativePlayer(videoID: id)
+        }
+    }
+
+    /// Clears the foreign cookie jar and opens YouTube's sign-in on the watch
+    /// page. Google's redirect only completes when those pasted cookies are gone.
+    func signInForPlayback() {
+        needsSignIn = true
+        errorMessage = "Sign in on this page. The player keeps that sign-in for later videos."
+        let videoID = currentVideoID
+        let start = currentTime
+        if let url = webView.url, Self.isGoogleSignInURL(url) || url.path.hasPrefix("/signin") {
+            return
+        }
+        Task { @MainActor in
+            await CookieStore.shared.resetWebSession()
+            UserDefaults.standard.set(true, forKey: CookieStore.playbackSessionResetKey)
+            let next = videoID.flatMap { self.watchURL(videoID: $0, start: start)?.absoluteString }
+                ?? "https://www.youtube.com/"
+            var components = URLComponents(string: "https://www.youtube.com/signin")
+            components?.queryItems = [URLQueryItem(name: "next", value: next)]
+            guard let url = components?.url else { return }
+            self.pageKind = .watch
+            self.pageVideoID = videoID
+            self.webView.load(URLRequest(url: url))
         }
     }
 
@@ -299,6 +332,19 @@ final class YouTubePlayer: NSObject {
         """
     }
 
+    /// `pageKind` stays `.watch` through the Google sign-in redirect, so the
+    /// loaded document has to be this video's watch or embed page.
+    private func isShowing(videoID: String) -> Bool {
+        guard pageKind == .embed || pageKind == .watch,
+              let url = webView.url,
+              url.host?.lowercased().hasSuffix("youtube.com") == true else { return false }
+        if url.path == "/watch" {
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+            return items?.contains { $0.name == "v" && $0.value == videoID } == true
+        }
+        return url.path.hasPrefix("/embed/\(videoID)")
+    }
+
     private func watchURL(videoID: String, start: Double) -> URL? {
         var items = [
             URLQueryItem(name: "v", value: videoID),
@@ -385,7 +431,8 @@ final class YouTubePlayer: NSObject {
             let requiresBrowser = message["bot"] as? Bool == true
             if requiresBrowser, pageKind == .watch,
                let id = pageVideoID, id == currentVideoID {
-                errorMessage = "YouTube requires verification. Complete it here to continue playback in Bower."
+                needsSignIn = true
+                errorMessage = "YouTube won't play this until you sign in inside the player."
             }
             // #region agent log
             agentLog("H2", "YouTubePlayer.pageprobe", "watch document", [
@@ -553,6 +600,7 @@ final class YouTubePlayer: NSObject {
             updateTime(message)
             if state == .playing {
                 errorMessage = nil
+                needsSignIn = false
                 if !reportedPlaying {
                     reportedPlaying = true
                     onStartedPlaying?()
@@ -571,12 +619,13 @@ final class YouTubePlayer: NSObject {
             // #endregion
             if shouldLeaveEmbed(code, videoID: videoID) { return }
             if pageKind == .setup, code == 152 || code == 153 || code == 1503 { return }
+            if code == 1503 { needsSignIn = true }
             errorMessage = switch code {
             case 2: "This video ID is invalid."
             case 5: "This video can't be played in the HTML5 player."
             case 100: "This video was removed or made private."
             case 101, 150: "The owner doesn't allow this video to be played outside YouTube."
-            case 1503: "YouTube asked for a sign-in confirmation and didn't start the video."
+            case 1503: "YouTube won't play this until you sign in inside the player."
             default: "Playback failed (error \(code))."
             }
         default:
@@ -635,7 +684,8 @@ final class YouTubePlayer: NSObject {
       }
       var autoplay = /[?&]autoplay=1/.test(location.search);
       var watch = location.pathname.indexOf('/watch') === 0;
-      if (watch && !document.getElementById('bower-player-fit')) {
+      function fitPlayer() {
+        if (!watch || document.getElementById('bower-player-fit')) return;
         var style = document.createElement('style');
         style.id = 'bower-player-fit';
         style.textContent = 'ytd-masthead,#masthead-container,#secondary,#related,#comments,#below,ytd-watch-metadata,#guide,tp-yt-app-drawer{display:none!important}html,body{background:#000!important;overflow:hidden!important}ytd-player,#player-container,#player{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;z-index:10000!important;background:#000!important}';
@@ -862,12 +912,7 @@ final class YouTubePlayer: NSObject {
           attempts++;
           start(video);
         }
-        if (watch && video.readyState >= 2 && video.getAttribute('data-bower') !== '1') {
-          video.setAttribute('data-bower', '1');
-          document.documentElement.appendChild(video);
-          video.setAttribute('style', 'position:fixed;inset:0;width:100vw;height:100vh;z-index:2147483647;background:#000;object-fit:contain');
-          video.controls = true;
-        }
+        if (watch && (video.currentSrc || video.src)) fitPlayer();
         var state = video.ended ? 0 : (!hasMedia || video.paused ? 2 : (video.readyState < 3 ? 3 : 1));
         var payload = {
           type: state === lastState ? 'time' : 'state',
@@ -1010,7 +1055,8 @@ extension YouTubePlayer: WKNavigationDelegate, WKUIDelegate {
     }
 
     private static func isGoogleSignInURL(_ url: URL) -> Bool {
-        url.host?.lowercased() == "accounts.google.com"
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "accounts.google.com" || host == "accounts.youtube.com" || host == "myaccount.google.com"
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

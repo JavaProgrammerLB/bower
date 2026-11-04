@@ -53,7 +53,6 @@ final class AppModel {
         playback = PlaybackModel(store: store)
         library = LibraryService(store: store)
         reloadDisplayed()
-        Task { await CookieStore.shared.syncToWebKit(clearExisting: true) }
     }
 
     var displayedTitle: String {

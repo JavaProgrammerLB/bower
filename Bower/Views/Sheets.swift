@@ -127,7 +127,7 @@ struct CookieSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("YouTube Account")
                     .font(.title3.weight(.semibold))
-                Text("Signs library requests and the video player in as your account, so YouTube stops treating Bower as a bot. Paste the `cookie` header from a signed-in youtube.com request, or the contents of a cookies.txt export.")
+                Text("Signs library requests in as your account. Playback does not use this cookie — when a video asks you to sign in, do that inside the player. Paste the `cookie` header from a signed-in youtube.com request, or the contents of a cookies.txt export.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -206,8 +206,6 @@ struct CookieSheet: View {
         hasSaved = true
         input = ""
         Task {
-            await CookieStore.shared.syncToWebKit(clearExisting: true)
-            app.playback.player.reload()
             let result = await InnerTubeClient.shared.verifySignedIn()
             if result.signedIn {
                 status = .ok(result.accountName.map { "Signed in as \($0)." } ?? "Cookie accepted by YouTube.")
@@ -221,11 +219,7 @@ struct CookieSheet: View {
         CookieStore.shared.set("")
         hasSaved = false
         input = ""
-        status = .ok("Cookie removed. Requests and playback are anonymous again.")
-        Task {
-            await CookieStore.shared.syncToWebKit(clearExisting: true)
-            app.playback.player.reload()
-        }
+        status = .ok("Cookie removed. Library requests are anonymous again.")
     }
 }
 

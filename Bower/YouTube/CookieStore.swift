@@ -2,9 +2,10 @@ import Foundation
 import Synchronization
 import WebKit
 
-/// The YouTube `Cookie` header the user pasted in. It signs InnerTube requests
-/// and is mirrored into the web view's cookie jar so the embedded player is
-/// signed in too — anonymous playback is what YouTube's bot check targets.
+/// The YouTube `Cookie` header the user pasted in. It signs InnerTube library
+/// requests only. The watch page does not accept this copy: YouTube still
+/// returns LOGIN_REQUIRED, and the foreign cookies make an in-player Google
+/// sign-in finish at CookieMismatch. Playback uses the web view's own session.
 ///
 /// Kept as a plain file in the app's data folder (mode 0600): anything running
 /// as this user could read the browser profile it came from just as easily.
@@ -49,8 +50,43 @@ nonisolated final class CookieStore: Sendable {
 }
 
 extension CookieStore {
+    static let playbackSessionResetKey = "bower.resetInjectedWebSession"
+
+    /// One-time removal of cookies this app used to copy into the web view.
+    /// Later launches keep whatever sign-in the web view established itself.
+    @MainActor
+    func preparePlaybackSession() async {
+        guard !UserDefaults.standard.bool(forKey: Self.playbackSessionResetKey) else { return }
+        await resetWebSession()
+        UserDefaults.standard.set(true, forKey: Self.playbackSessionResetKey)
+    }
+
+    /// Removes YouTube and Google website data from the web view so a sign-in
+    /// started there is not mixed with a cookie header copied from a browser.
+    @MainActor
+    func resetWebSession() async {
+        let store = WKWebsiteDataStore.default()
+        let types = WKWebsiteDataStore.allWebsiteDataTypes()
+        let records = await store.dataRecords(ofTypes: types)
+        let matching = records.filter { Self.isAccountDomain($0.displayName) }
+        if !matching.isEmpty {
+            await store.removeData(ofTypes: types, for: matching)
+        }
+        let jar = store.httpCookieStore
+        for cookie in await jar.allCookies() where Self.isAccountDomain(cookie.domain) {
+            await jar.deleteCookie(cookie)
+        }
+    }
+
+    private static func isAccountDomain(_ name: String) -> Bool {
+        let host = name.lowercased()
+        return host.contains("youtube") || host.contains("youtu.be") || host.contains("google")
+    }
+
     /// Replaces the web view's youtube.com cookies with the stored ones. With
     /// no stored cookie, the player keeps building its own visitor session.
+    /// Playback must not call this: those copied cookies are what the watch
+    /// page rejects.
     @MainActor
     func syncToWebKit(clearExisting: Bool) async {
         let jar = WKWebsiteDataStore.default().httpCookieStore

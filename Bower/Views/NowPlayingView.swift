@@ -11,14 +11,21 @@ struct NowPlayingView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         PlayerSurface(player: playback.player)
-                            .aspectRatio(16 / 9, contentMode: .fit)
+                            .modifier(PlayerFrame(expanded: playback.player.needsSignIn))
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .shadow(color: .black.opacity(0.18), radius: 14, y: 6)
 
                         if let message = playback.player.errorMessage {
-                            Label(message, systemImage: "person.crop.circle.badge.exclamationmark")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
+                            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                Label(message, systemImage: "person.crop.circle.badge.exclamationmark")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                if playback.player.needsSignIn {
+                                    Button("Sign in to YouTube") { playback.player.signInForPlayback() }
+                                        .buttonStyle(.borderedProminent)
+                                        .controlSize(.small)
+                                }
+                            }
                         }
 
                         VideoHeader(video: video)
@@ -202,6 +209,20 @@ private struct DescriptionSection: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Taller while YouTube's own sign-in page is on screen, so the form is not
+/// cropped to the 16:9 player.
+private struct PlayerFrame: ViewModifier {
+    var expanded: Bool
+
+    func body(content: Content) -> some View {
+        if expanded {
+            content.frame(height: 680)
+        } else {
+            content.aspectRatio(16 / 9, contentMode: .fit)
+        }
     }
 }
 
