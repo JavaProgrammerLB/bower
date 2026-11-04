@@ -62,6 +62,13 @@ final class YouTubePlayer: NSObject {
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false
         ))
+        // Runs after the bridge so it wraps that fetch hook. Timedtext is copied
+        // out and translated; every other request passes through.
+        controller.addUserScript(WKUserScript(
+            source: SubtitleScript.source,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        ))
         controller.addUserScript(WKUserScript(
             source: Self.cookieDiagScript,
             injectionTime: .atDocumentEnd,
@@ -274,6 +281,19 @@ final class YouTubePlayer: NSObject {
         send(.seek(0))
     }
 
+    /// Pushes the Settings toggle into a player page that's already open.
+    /// The next watch page also reads the same preference when it loads.
+    func setChineseSubtitles(_ enabled: Bool) {
+        call("window.__bowerApplySubtitleCfg&&window.__bowerApplySubtitleCfg(\(enabled))")
+    }
+
+    static var chineseSubtitlesEnabled: Bool {
+        if UserDefaults.standard.object(forKey: chineseSubtitlesKey) == nil { return true }
+        return UserDefaults.standard.bool(forKey: chineseSubtitlesKey)
+    }
+
+    static let chineseSubtitlesKey = "chineseSubtitles"
+
     func stop() {
         currentVideoID = nil
         pageVideoID = nil
@@ -306,6 +326,7 @@ final class YouTubePlayer: NSObject {
             URLQueryItem(name: "rel", value: "0"),
             URLQueryItem(name: "enablejsapi", value: "1"),
             URLQueryItem(name: "origin", value: "https://www.youtube.com"),
+            URLQueryItem(name: "cc_load_policy", value: "1"),
         ]
         if start > 1 {
             items.append(URLQueryItem(name: "start", value: String(Int(start.rounded(.down)))))
@@ -349,6 +370,8 @@ final class YouTubePlayer: NSObject {
         var items = [
             URLQueryItem(name: "v", value: videoID),
             URLQueryItem(name: "autoplay", value: "1"),
+            // Loads the caption module so the timedtext hook has a track to translate.
+            URLQueryItem(name: "cc_load_policy", value: "1"),
         ]
         if start > 1 {
             items.append(URLQueryItem(name: "t", value: "\(Int(start.rounded(.down)))s"))
@@ -414,6 +437,14 @@ final class YouTubePlayer: NSObject {
 
     fileprivate func handle(_ body: Any) {
         guard let message = body as? [String: Any], let type = message["type"] as? String else { return }
+        if type == "subtitlecfg" {
+            call("window.__bowerApplySubtitleCfg&&window.__bowerApplySubtitleCfg(\(Self.chineseSubtitlesEnabled))")
+            return
+        }
+        if type == "subtitle" {
+            receiveSubtitle(message)
+            return
+        }
         if type == "clientdiag" {
             // #region agent log
             agentLog("H15", "YouTubePlayer.clientdiag", "webview client", [
@@ -631,6 +662,45 @@ final class YouTubePlayer: NSObject {
         default:
             break
         }
+    }
+
+    private func receiveSubtitle(_ message: [String: Any]) {
+        let id = message["id"] as? String ?? ""
+        guard Self.chineseSubtitlesEnabled else {
+            deliverSubtitles(id: id, cues: nil)
+            return
+        }
+        let body = message["body"] as? String ?? ""
+        let lang = message["lang"] as? String ?? ""
+        let tlang = message["tlang"] as? String ?? ""
+        let video = message["video"] as? String ?? ""
+        Task {
+            _ = await CaptionTranslator.shared.translate(body: body, lang: lang, tlang: tlang) { cues in
+                Task { @MainActor in
+                    guard Self.chineseSubtitlesEnabled else { return }
+                    // A long track finishes after the next video has already loaded.
+                    if !video.isEmpty, video != self.currentVideoID { return }
+                    self.deliverSubtitles(id: id, cues: cues)
+                }
+            }
+        }
+    }
+
+    private func deliverSubtitles(id: String, cues: [CaptionCue]?) {
+        let payload: String
+        if let cues,
+           let data = try? JSONSerialization.data(withJSONObject: cues.map {
+               ["start": $0.startMs, "end": $0.endMs, "text": $0.text, "source": $0.source]
+           }),
+           var json = String(data: data, encoding: .utf8) {
+            json = json
+                .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+                .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+            payload = json
+        } else {
+            payload = "null"
+        }
+        call("window.__bowerSubtitleDone&&window.__bowerSubtitleDone(\(Self.jsString(id)),\(payload))")
     }
 
     private func updateTime(_ message: [String: Any]) {

@@ -395,6 +395,7 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var app
     @AppStorage("theme") private var theme: Theme = .system
     @AppStorage("alwaysOnTop") private var alwaysOnTop = false
+    @AppStorage(YouTubePlayer.chineseSubtitlesKey) private var chineseSubtitles = true
 
     var body: some View {
         Form {
@@ -404,6 +405,13 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 Toggle("Keep window on top of other apps", isOn: $alwaysOnTop)
+            }
+
+            Section("Subtitles") {
+                Toggle("Chinese subtitles", isOn: $chineseSubtitles)
+                Text("Translates the video's captions into Chinese and draws them on the player, with the original line above.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("YouTube Account") {
@@ -427,5 +435,8 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 460)
         .fixedSize(horizontal: false, vertical: true)
+        .onChange(of: chineseSubtitles) { _, enabled in
+            app.playback.player.setChineseSubtitles(enabled)
+        }
     }
 }
