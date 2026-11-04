@@ -39,6 +39,13 @@ final class YouTubePlayer: NSObject {
     @ObservationIgnored private var pageVideoID: String?
     @ObservationIgnored private var fellBackToWatch = false
     @ObservationIgnored private var playGeneration = 0
+    /// A broken Google cookie jar survives relaunch. Recover once per video,
+    /// then stop so a redirect loop cannot keep wiping the session.
+    @ObservationIgnored private var cookieRecoveryAttempts = 0
+    @ObservationIgnored private var cookieRecoveryInFlight = false
+    /// One attempt to attach the web view's existing Google session to YouTube
+    /// without leaving the user on the identifier form.
+    @ObservationIgnored private var triedSessionAttach = false
 
     var isPlaying: Bool { state == .playing || state == .buffering }
 
@@ -51,7 +58,15 @@ final class YouTubePlayer: NSObject {
         let controller = WKUserContentController()
         config.userContentController = controller
 
-        webView = WKWebView(frame: .zero, configuration: config)
+        // The process default rejects cookies that are not for the main
+        // document host. Google's sign-in then stops on its cookie-settings
+        // page, and that page replaces the video.
+        HTTPCookieStorage.shared.cookieAcceptPolicy = .always
+        webView = PlaybackWebView(frame: .zero, configuration: config)
+        // The default WebKit identifier has no Safari token. YouTube answers
+        // that with a sign-in wall and never mounts a video. This is the same
+        // browser identifier the library requests already use.
+        webView.customUserAgent = InnerTubeClient.userAgent
         webView.setValue(false, forKey: "drawsBackground")
         webView.underPageBackgroundColor = .black
         super.init()
@@ -71,6 +86,11 @@ final class YouTubePlayer: NSObject {
         ))
         controller.addUserScript(WKUserScript(
             source: Self.cookieDiagScript,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        ))
+        controller.addUserScript(WKUserScript(
+            source: Self.cookieFailureScript,
             injectionTime: .atDocumentEnd,
             forMainFrameOnly: true
         ))
@@ -110,6 +130,8 @@ final class YouTubePlayer: NSObject {
         currentVideoID = videoID
         reportedPlaying = false
         errorMessage = nil
+        cookieRecoveryAttempts = 0
+        triedSessionAttach = false
         let start = (start ?? 0).rounded(.down)
         currentTime = start
         needsSignIn = false
@@ -132,7 +154,7 @@ final class YouTubePlayer: NSObject {
             send(.play)
             return
         }
-        if pageVideoID == id, isShowing(videoID: id) {
+        if pageVideoID == id, isShowing(videoID: id), isPlaying {
             // #region agent log
             agentLog("H4", "YouTubePlayer.play", "already on page", ["pageKind": "\(pageKind)", "video": id])
             // #endregion
@@ -149,6 +171,9 @@ final class YouTubePlayer: NSObject {
             // Drop cookies previously copied in from the pasted header. Once
             // the web view has signed in on its own, leave that session alone.
             await CookieStore.shared.preparePlaybackSession()
+            // Copied www.youtube.com cookies hide the Google session this web
+            // view already has, and the watch page then refuses to play.
+            await CookieStore.shared.dropInjectedPlaybackCookies()
             let stillCurrent = generation == self.playGeneration && self.currentVideoID == id
             // #region agent log
             agentLog("H4", "YouTubePlayer.play", "after session prepare", ["generation": generation, "stillCurrent": stillCurrent, "video": id])
@@ -162,27 +187,16 @@ final class YouTubePlayer: NSObject {
         }
     }
 
-    /// Clears the foreign cookie jar and opens YouTube's sign-in on the watch
-    /// page. Google's redirect only completes when those pasted cookies are gone.
+    /// The player stays on the watch page. Copied cookies are removed so the
+    /// web view's own Google session can play the video here.
     func signInForPlayback() {
-        needsSignIn = true
-        errorMessage = "Sign in on this page. The player keeps that sign-in for later videos."
-        let videoID = currentVideoID
+        needsSignIn = false
+        errorMessage = nil
+        guard let videoID = currentVideoID else { return }
         let start = currentTime
-        if let url = webView.url, Self.isGoogleSignInURL(url) || url.path.hasPrefix("/signin") {
-            return
-        }
         Task { @MainActor in
-            await CookieStore.shared.resetWebSession()
-            UserDefaults.standard.set(true, forKey: CookieStore.playbackSessionResetKey)
-            let next = videoID.flatMap { self.watchURL(videoID: $0, start: start)?.absoluteString }
-                ?? "https://www.youtube.com/"
-            var components = URLComponents(string: "https://www.youtube.com/signin")
-            components?.queryItems = [URLQueryItem(name: "next", value: next)]
-            guard let url = components?.url else { return }
-            self.pageKind = .watch
-            self.pageVideoID = videoID
-            self.webView.load(URLRequest(url: url))
+            await CookieStore.shared.dropInjectedPlaybackCookies()
+            self.loadWatchPage(videoID: videoID, start: start)
         }
     }
 
@@ -461,7 +475,7 @@ final class YouTubePlayer: NSObject {
         if type == "pageprobe" {
             let requiresBrowser = message["bot"] as? Bool == true
             if requiresBrowser, pageKind == .watch,
-               let id = pageVideoID, id == currentVideoID {
+               let id = pageVideoID, id == currentVideoID, !needsSignIn {
                 needsSignIn = true
                 errorMessage = "YouTube won't play this until you sign in inside the player."
             }
@@ -479,6 +493,10 @@ final class YouTubePlayer: NSObject {
                 "ready": message["ready"] as? String ?? "",
             ])
             // #endregion
+            return
+        }
+        if type == "cookieblocked" {
+            recoverFromBlockedCookies()
             return
         }
         if type == "cookiediag" {
@@ -601,6 +619,13 @@ final class YouTubePlayer: NSObject {
                 if let value = message[key] as? Double { return Int(value) }
                 return -1
             }
+            let status = message["status"] as? String ?? ""
+            let loggedIn = message["loggedIn"] as? Bool ?? false
+            if status == "LOGIN_REQUIRED", !loggedIn, pageKind == .watch, !triedSessionAttach,
+               let id = currentVideoID, id == pageVideoID {
+                triedSessionAttach = true
+                attachExistingSession(videoID: id)
+            }
             agentLog("H6", "YouTubePlayer.playdiag", "player response", [
                 "loggedIn": message["loggedIn"] as? Bool ?? false,
                 "status": message["status"] as? String ?? "",
@@ -630,6 +655,8 @@ final class YouTubePlayer: NSObject {
             state = State(rawValue: value) ?? .unstarted
             updateTime(message)
             if state == .playing {
+                cookieRecoveryAttempts = 0
+                triedSessionAttach = false
                 errorMessage = nil
                 needsSignIn = false
                 if !reportedPlaying {
@@ -706,6 +733,78 @@ final class YouTubePlayer: NSObject {
     private func updateTime(_ message: [String: Any]) {
         if let time = message["time"] as? Double { currentTime = time }
         if let total = message["duration"] as? Double, total > 0 { duration = total }
+    }
+
+    /// Google shows this page when the web view's stored cookies cannot
+    /// complete sign-in. The jar is persistent, so the next launch hits it
+    /// again unless playback drops those cookies and returns to the video.
+    private static let cookieFailureScript = """
+    (function () {
+      if (window.__bowerCookieFailure) return;
+      window.__bowerCookieFailure = true;
+      function blocked() {
+        var path = (location.pathname || '').toLowerCase();
+        if (path.indexOf('cookiemismatch') !== -1 || path.indexOf('cookieerror') !== -1) return true;
+        if (path.indexOf('/info/cookies') !== -1) return true;
+        var text = document.body ? document.body.innerText.slice(0, 700) : '';
+        return /我们检测到您的 Cookie 设置存在问题|We detected a problem with your cookie settings|您的浏览器已停用 Cookie 功能/.test(text);
+      }
+      function report() {
+        if (!blocked()) return;
+        try {
+          window.webkit.messageHandlers.lt.postMessage({
+            type: 'cookieblocked',
+            host: location.hostname,
+            path: location.pathname
+          });
+        } catch (e) {}
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', report);
+      else report();
+      setTimeout(report, 500);
+    })();
+    """
+
+    /// The watch page will not play until YouTube accepts this web view.
+    /// A Google session is already stored here. Opening YouTube's sign-in
+    /// lets that session continue back to the video instead of the bot wall.
+    private func attachExistingSession(videoID: String) {
+        let next = watchURL(videoID: videoID, start: currentTime)?.absoluteString
+            ?? "https://www.youtube.com/"
+        var components = URLComponents(string: "https://www.youtube.com/signin")
+        components?.queryItems = [
+            URLQueryItem(name: "next", value: next),
+            URLQueryItem(name: "app", value: "desktop"),
+        ]
+        guard let url = components?.url else { return }
+        needsSignIn = false
+        errorMessage = nil
+        pageKind = .watch
+        pageVideoID = videoID
+        webView.load(URLRequest(url: url))
+    }
+
+    private func recoverFromBlockedCookies() {
+        guard let videoID = currentVideoID else { return }
+        guard !cookieRecoveryInFlight, cookieRecoveryAttempts < 1 else { return }
+        cookieRecoveryInFlight = true
+        cookieRecoveryAttempts += 1
+        needsSignIn = false
+        errorMessage = nil
+        let start = currentTime
+        Task { @MainActor in
+            await CookieStore.shared.dropInjectedPlaybackCookies()
+            self.cookieRecoveryInFlight = false
+            guard self.currentVideoID == videoID else { return }
+            self.loadWatchPage(videoID: videoID, start: start)
+        }
+    }
+
+    private static func isCookieFailureURL(_ url: URL) -> Bool {
+        let path = url.path.lowercased()
+        if path.contains("cookiemismatch") || path.contains("cookieerror") { return true }
+        let host = url.host?.lowercased() ?? ""
+        return host.contains("google.") && path.contains("/info/cookies")
     }
 
     // #region agent log
@@ -1066,6 +1165,12 @@ final class YouTubePlayer: NSObject {
 
 extension YouTubePlayer: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
+        if navigationAction.targetFrame?.isMainFrame != false,
+           let url = navigationAction.request.url,
+           Self.isCookieFailureURL(url) {
+            recoverFromBlockedCookies()
+            return .cancel
+        }
         // Links inside the player (title, channel, logo) open in the browser
         // rather than replacing the player page.
         if navigationAction.targetFrame?.isMainFrame != false,
@@ -1117,7 +1222,11 @@ extension YouTubePlayer: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         if let url = navigationAction.request.url, Self.isGoogleSignInURL(url) {
-            webView.load(navigationAction.request)
+            if Self.isCookieFailureURL(url) {
+                recoverFromBlockedCookies()
+            } else {
+                webView.load(navigationAction.request)
+            }
         } else if let url = navigationAction.request.url {
             NSWorkspace.shared.open(url)
         }
@@ -1134,13 +1243,30 @@ extension YouTubePlayer: WKNavigationDelegate, WKUIDelegate {
     }
 }
 
+/// A watch page is far taller than the player. Reporting that height makes
+/// AppKit run constraint passes until it aborts and the app quits.
+private final class PlaybackWebView: WKWebView {
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+    }
+
+    /// A document resize used to ask the window for another constraint pass
+    /// while SwiftUI was already in one, and AppKit quit the app.
+    override func invalidateIntrinsicContentSize() {}
+}
+
 /// WKUserContentController retains its handlers; this breaks the cycle.
 private final class WeakMessageHandler: NSObject, WKScriptMessageHandler {
     weak var target: YouTubePlayer?
     init(_ target: YouTubePlayer) { self.target = target }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        target?.handle(message.body)
+        let body = message.body
+        // The page posts during AppKit layout. Applying that immediately
+        // starts another constraint pass and the window aborts.
+        DispatchQueue.main.async { [weak target] in
+            target?.handle(body)
+        }
     }
 }
 

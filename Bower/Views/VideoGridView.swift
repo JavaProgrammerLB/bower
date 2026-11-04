@@ -120,7 +120,6 @@ private struct VideoCard: View {
                         ZStack {
                             Color.black.opacity(0.4)
                             Label("Now Playing", systemImage: app.playback.player.isPlaying ? "waveform" : "pause.fill")
-                                .symbolEffect(.variableColor.iterative, isActive: app.playback.player.isPlaying)
                                 .font(.callout.weight(.semibold))
                                 .foregroundStyle(.white)
                         }

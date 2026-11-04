@@ -1,5 +1,7 @@
 import AppKit
+import ObjectiveC
 import SwiftUI
+import WebKit
 
 struct NowPlayingView: View {
     @Environment(AppModel.self) private var app
@@ -218,11 +220,9 @@ private struct PlayerFrame: ViewModifier {
     var expanded: Bool
 
     func body(content: Content) -> some View {
-        if expanded {
-            content.frame(height: 680)
-        } else {
-            content.aspectRatio(16 / 9, contentMode: .fit)
-        }
+        content
+            .aspectRatio(16 / 9, contentMode: .fit)
+            .frame(maxHeight: expanded ? 680 : nil)
     }
 }
 
@@ -231,24 +231,83 @@ private struct PlayerFrame: ViewModifier {
 struct PlayerSurface: NSViewRepresentable {
     let player: YouTubePlayer
 
+    func makeCoordinator() -> Coordinator { Coordinator(player) }
+
     func makeNSView(context: Context) -> NSView {
-        let container = NSView()
+        let container = PlayerHostView()
         container.wantsLayer = true
         container.layer?.backgroundColor = NSColor.black.cgColor
-        attach(to: container)
+        // After this layout pass. Attaching the page during the pass that
+        // swaps the grid for the player is what overflows AppKit.
+        Self.attachLater(player.webView, to: container)
         return container
     }
 
     func updateNSView(_ container: NSView, context: Context) {
-        if player.webView.superview !== container { attach(to: container) }
+        guard player.webView.superview !== container else { return }
+        Self.attachLater(player.webView, to: container)
     }
 
-    private func attach(to container: NSView) {
-        let webView = player.webView
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        let webView = coordinator.player.webView
+        guard webView.superview === nsView else { return }
+        // Keep this host alive through the current constraint pass. Removing
+        // the page in the pass that swaps in the grid makes AppKit abort.
+        objc_setAssociatedObject(webView, &PlaybackParking.retainKey, nsView, .OBJC_ASSOCIATION_RETAIN)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            if webView.superview === nsView {
+                PlaybackParking.hold(webView)
+            }
+            objc_setAssociatedObject(webView, &PlaybackParking.retainKey, nil, .OBJC_ASSOCIATION_ASSIGN)
+        }
+    }
+
+    private static func attachLater(_ webView: WKWebView, to container: NSView) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak container] in
+            guard let container, container.window != nil else { return }
+            guard webView.superview !== container else { return }
+            attach(webView, to: container)
+        }
+    }
+
+    private static func attach(_ webView: WKWebView, to container: NSView) {
         webView.removeFromSuperview()
+        // No constraints. The page's height must not enter the window's solver.
+        webView.translatesAutoresizingMaskIntoConstraints = false
         webView.frame = container.bounds
-        webView.autoresizingMask = [.width, .height]
         container.addSubview(webView)
+    }
+
+    final class Coordinator {
+        let player: YouTubePlayer
+        init(_ player: YouTubePlayer) { self.player = player }
+    }
+}
+
+/// Holds the page while the grid is on screen, so playback is not torn down
+/// and the watch page is not part of the window's constraint loop.
+enum PlaybackParking {
+    static var retainKey: UInt8 = 0
+    private static let host = NSView(frame: NSRect(x: 0, y: 0, width: 16, height: 9))
+
+    static func hold(_ webView: WKWebView) {
+        webView.removeFromSuperview()
+        webView.frame = host.bounds
+        host.addSubview(webView)
+    }
+}
+
+/// Keeps the YouTube document's size from resizing the player.
+private final class PlayerHostView: NSView {
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+    }
+
+    override func invalidateIntrinsicContentSize() {}
+
+    override func layout() {
+        super.layout()
+        for subview in subviews { subview.frame = bounds }
     }
 }
 

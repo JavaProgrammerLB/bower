@@ -61,6 +61,28 @@ extension CookieStore {
         UserDefaults.standard.set(true, forKey: Self.playbackSessionResetKey)
     }
 
+    /// Deletes the host-only www.youtube.com cookies copied from the pasted
+    /// header. Those copies are visible to the page and are not a real login,
+    /// so the watch page stays on the bot wall even after Google sign-in.
+    /// The web view's own Google session and leading-dot YouTube cookies stay.
+    @MainActor
+    func dropInjectedPlaybackCookies() async {
+        let jar = WKWebsiteDataStore.default().httpCookieStore
+        var dropped = 0
+        for cookie in await jar.allCookies() {
+            let domain = cookie.domain.lowercased()
+            let hostOnly = domain == "www.youtube.com" || domain == ".www.youtube.com"
+            guard hostOnly, !cookie.isHTTPOnly else { continue }
+            await jar.deleteCookie(cookie)
+            dropped += 1
+        }
+        // #region agent log
+        agentLog("H1", "CookieStore.dropInjectedPlaybackCookies", "dropped copied cookies", [
+            "dropped": dropped
+        ])
+        // #endregion
+    }
+
     /// Removes YouTube and Google website data from the web view so a sign-in
     /// started there is not mixed with a cookie header copied from a browser.
     @MainActor

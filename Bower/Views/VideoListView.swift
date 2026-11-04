@@ -223,7 +223,6 @@ struct VideoRow: View {
                     .padding(4)
                 if isCurrent {
                     Image(systemName: isPlaying ? "waveform" : "pause.fill")
-                        .symbolEffect(.variableColor.iterative, isActive: isPlaying)
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: 112, height: 63)

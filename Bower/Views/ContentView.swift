@@ -14,13 +14,11 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 380)
         } detail: {
             ZStack {
-                // Kept in the window while hidden so playback carries on
-                // while browsing the grid.
-                NowPlayingView()
-                    .opacity(app.isPlayerVisible ? 1 : 0)
-                    .allowsHitTesting(app.isPlayerVisible)
-                    .accessibilityHidden(!app.isPlayerVisible)
-                if !app.isPlayerVisible {
+                // One at a time. A hidden watch page inside this split view
+                // keeps asking for constraint passes until AppKit quits the app.
+                if app.isPlayerVisible {
+                    NowPlayingView()
+                } else {
                     VideoGridView()
                 }
             }

@@ -48,7 +48,7 @@ struct BowerApp: App {
                 // throws "more Update Constraints in Window passes than there
                 // are views"). Wide enough for sidebar + player + video list,
                 // which otherwise overflow and get cropped on both sides.
-                .frame(minWidth: model.isPlayerVisible && model.showVideoList ? 960 : 760, minHeight: 460)
+                .frame(minWidth: 960, minHeight: 460)
                 .onAppear {
                     delegate.model = model
                     NSApp.appearance = theme.appearance
